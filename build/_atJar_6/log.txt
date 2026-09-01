@@ -1,7 +1,0 @@
-Java Launcher: D:\codingan\.gradle\jdks\eclipse_adoptium-17-amd64-windows\jdk-17.0.20+8\bin\java.exe
-Arguments: '--inJar, D:\codingan\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge\forge\1.20.1-47.3.0\forge-1.20.1-47.3.0-injected.jar, --outJar, D:\codingan\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge\forge\1.20.1-47.3.0_mapped_official_1.20.1\forge-1.20.1-47.3.0_mapped_official_1.20.1.jar, --logFile, accesstransform.log, --atFile, D:\codingan\A-project-corazon\build\_atJar_6\parent_at.cfg'
-Classpath:
- - D:\codingan\.gradle\caches\forge_gradle\maven_downloader\net\minecraftforge\accesstransformers\8.2.14\accesstransformers-8.2.14-fatjar.jar
-Working directory: D:\codingan\A-project-corazon\build\_atJar_6
-Main class: net.minecraftforge.accesstransformer.TransformerProcessor
-====================================

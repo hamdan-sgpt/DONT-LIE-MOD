@@ -1,4 +1,4 @@
-# Gradle build outputs
+# Gradle build & compiled outputs
 .gradle/
 build/
 bin/
@@ -10,12 +10,16 @@ bin/
 *.ipr
 *.iws
 
-# Minecraft Run directories & logs
+# Minecraft Run directories & world test saves
 run/
 run-client1/
 run-client2/
 run_client2/
 *.log
+
+# Unzipped assets & setup folders
+kamish-dagger-1-20-1-e1560/
+setup.bat
 
 # Helper Scripts & Generator Tools (Excluded from Repo)
 copy_kamish.*
