@@ -1,0 +1,28 @@
+# Gradle build outputs
+.gradle/
+build/
+bin/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Minecraft Run directories & logs
+run/
+run-client1/
+run-client2/
+run_client2/
+*.log
+
+# Temporary Utility Scripts & Zip archives
+install_kamish.*
+medieval_recolor.*
+restore_kamish.*
+parse_level.js
+scan_mca_blocks.js
+*.zip
+*.pyc
+__pycache__/
