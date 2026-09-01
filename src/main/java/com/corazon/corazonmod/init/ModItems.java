@@ -21,12 +21,7 @@ public class ModItems {
             () -> new SwordItem(Tiers.NETHERITE, 7, -2.4F, new Item.Properties().fireResistant()));
 
     public static final RegistryObject<Item> MONEY_POUCH = ITEMS.register("money_pouch",
-            () -> new Item(new Item.Properties().stacksTo(1).fireResistant()) {
-                @Override
-                public boolean isFoil(net.minecraft.world.item.ItemStack pStack) {
-                    return true; // Glowing effect like enchanted item
-                }
-            });
+            () -> new Item(new Item.Properties().stacksTo(1).fireResistant()));
 
     public static final RegistryObject<Item> MAFIA_DAGGER = ITEMS.register("mafia_dagger",
             () -> new SwordItem(Tiers.DIAMOND, 5, -2.0F, new Item.Properties()));

@@ -32,6 +32,7 @@ public class CorazonMod {
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
+        com.corazon.corazonmod.init.ModEntities.register(modEventBus);
 
         // Register Setup Listener
         modEventBus.addListener(this::commonSetup);
@@ -73,6 +74,11 @@ public class CorazonMod {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             LOGGER.info("Corazon Mod Client Setup - GUI Screens & HUD Overlay registered!");
+        }
+
+        @SubscribeEvent
+        public static void registerRenderers(net.minecraftforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
+            event.registerEntityRenderer(com.corazon.corazonmod.init.ModEntities.MONEY_POUCH.get(), com.corazon.corazonmod.client.renderer.MoneyPouchRenderer::new);
         }
     }
 }

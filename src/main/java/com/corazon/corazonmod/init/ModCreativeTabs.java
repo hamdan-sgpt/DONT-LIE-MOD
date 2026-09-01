@@ -15,13 +15,16 @@ public class ModCreativeTabs {
 
     public static final RegistryObject<CreativeModeTab> CORAZON_TAB = CREATIVE_MODE_TABS.register("corazon_tab",
             () -> CreativeModeTab.builder()
-                    .icon(() -> new ItemStack(ModItems.CORAZON_COIN.get()))
+                    .icon(() -> new ItemStack(ModItems.MONEY_POUCH.get()))
                     .title(Component.translatable("creativetab.corazon_tab"))
                     .displayItems((parameters, output) -> {
-                        output.accept(ModItems.CORAZON_COIN.get());
-                        output.accept(ModItems.CORAZON_SWORD.get());
+                        // Game Items (Don't Lie)
                         output.accept(ModItems.MONEY_POUCH.get());
                         output.accept(ModItems.MAFIA_DAGGER.get());
+                        
+                        // General Mod Items & Blocks
+                        output.accept(ModItems.CORAZON_COIN.get());
+                        output.accept(ModItems.CORAZON_SWORD.get());
                         output.accept(ModBlocks.CORAZON_BLOCK.get());
                     })
                     .build());
