@@ -65,7 +65,7 @@ public class DontLieCommands {
                         .executes(ctx -> {
                             ServerPlayer voter = ctx.getSource().getPlayerOrException();
                             ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
-                            DontLieGame.getInstance().votePlayer(voter, target);
+                            DontLieGame.getInstance().votePlayer(voter, target.getUUID());
                             return 1;
                         })
                     )

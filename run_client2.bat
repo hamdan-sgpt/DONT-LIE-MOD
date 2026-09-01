@@ -25,7 +25,7 @@ if not exist "run-client2\MAP-DONT-LIE" (
 )
 
 if exist "fix_textures.py" (
-    echo [INFO] Menjaga tekstur Money Pouch & Items tetap up-to-date...
+    echo [INFO] Menjaga tekstur Money Pouch ^& Items tetap up-to-date...
     python fix_textures.py >nul 2>&1
 )
 

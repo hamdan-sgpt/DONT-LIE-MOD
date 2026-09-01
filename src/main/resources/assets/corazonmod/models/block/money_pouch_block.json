@@ -1,0 +1,32 @@
+{
+  "credit": "Made for CorazonMod Money Pouch Block",
+  "textures": {
+    "particle": "corazonmod:item/money_pouch",
+    "texture": "corazonmod:item/money_pouch"
+  },
+  "elements": [
+    {
+      "from": [5, 0, 5],
+      "to": [11, 6, 11],
+      "faces": {
+        "north": {"uv": [0, 0, 16, 16], "texture": "#texture"},
+        "east":  {"uv": [0, 0, 16, 16], "texture": "#texture"},
+        "south": {"uv": [0, 0, 16, 16], "texture": "#texture"},
+        "west":  {"uv": [0, 0, 16, 16], "texture": "#texture"},
+        "up":    {"uv": [0, 0, 16, 16], "texture": "#texture"},
+        "down":  {"uv": [0, 0, 16, 16], "texture": "#texture"}
+      }
+    },
+    {
+      "from": [6.5, 6, 6.5],
+      "to": [9.5, 8, 9.5],
+      "faces": {
+        "north": {"uv": [0, 0, 8, 8], "texture": "#texture"},
+        "east":  {"uv": [0, 0, 8, 8], "texture": "#texture"},
+        "south": {"uv": [0, 0, 8, 8], "texture": "#texture"},
+        "west":  {"uv": [0, 0, 8, 8], "texture": "#texture"},
+        "up":    {"uv": [0, 0, 8, 8], "texture": "#texture"}
+      }
+    }
+  ]
+}

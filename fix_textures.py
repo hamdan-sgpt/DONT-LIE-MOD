@@ -25,19 +25,19 @@ def create_png(width, height, pixels, filepath):
 
 # Color Palette (RGBA)
 _ = (0, 0, 0, 0)                  # Transparent
-K = (45, 25, 10, 255)             # Dark outline
-B = (139, 69, 19, 255)            # Base Brown Leather
-L = (180, 105, 50, 255)           # Light Brown Highlight
-D = (80, 40, 15, 255)             # Dark Brown Shadow
+K = (40, 20, 10, 255)             # Dark Outline
+B = (140, 75, 25, 255)            # Base Brown Leather
+L = (185, 110, 45, 255)           # Light Brown Highlight
+D = (90, 45, 15, 255)             # Dark Brown Shadow
 G = (255, 215, 0, 255)            # Bright Gold
-Y = (255, 245, 140, 255)          # Light Gold Accent
+Y = (255, 245, 140, 255)          # Light Gold Highlight
 O = (190, 140, 10, 255)           # Gold Rope/Shadow
 
 pouch_16x16 = [
     _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
-    _, _, _, _, _, _, K, K, K, K, _, _, _, _, _, _,
-    _, _, _, _, _, K, L, L, L, L, K, _, _, _, _, _,
-    _, _, _, _, _, K, D, L, L, D, K, _, _, _, _, _,
+    _, _, _, _, _, K, K, K, K, K, _, _, _, _, _, _,
+    _, _, _, _, K, L, L, L, L, L, K, _, _, _, _, _,
+    _, _, _, _, K, D, L, L, L, D, K, _, _, _, _, _,
     _, _, _, _, K, O, G, Y, G, O, K, _, _, _, _, _,
     _, _, _, K, D, B, B, B, B, B, D, K, _, _, _, _,
     _, _, K, D, B, L, L, L, L, B, B, D, K, _, _, _,

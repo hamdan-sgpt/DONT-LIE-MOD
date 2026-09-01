@@ -730,7 +730,7 @@ public class DontLieGame {
         return false;
     }
 
-    private void broadcastToAll(MinecraftServer server, Component message) {
+    public void broadcastToAll(MinecraftServer server, Component message) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             player.sendSystemMessage(message);
         }
