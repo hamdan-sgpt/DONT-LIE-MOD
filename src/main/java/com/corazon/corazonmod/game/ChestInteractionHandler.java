@@ -12,13 +12,14 @@ import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Listens for interactions with containers (chests, barrels, etc.).
- * Automatically accelerates Hiding Phase as soon as Mafia hides the Money Pouch in a chest.
+ * Listens for interactions with containers and physical Money Pouch placement/pickup.
+ * Allows slipping Money Pouch into any tiny gap, under furniture, or inside chests.
  */
 @Mod.EventBusSubscriber(modid = CorazonMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class ChestInteractionHandler {
@@ -31,13 +32,14 @@ public class ChestInteractionHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         DontLieGame game = DontLieGame.getInstance();
-        if (!game.isGameRunning()) return;
+        boolean isGameHidingPhase = game.isGameRunning() 
+            && game.getCurrentPhase() == GamePhase.HIDING 
+            && game.getRole(player.getUUID()) == PlayerRole.MAFIA;
 
-        // Check if game is in HIDING phase
-        if (game.getCurrentPhase() != GamePhase.HIDING) return;
+        boolean isTestingMode = !game.isGameRunning() || player.isCreative();
 
-        // Check if player is Mafia
-        if (game.getRole(player.getUUID()) != PlayerRole.MAFIA) return;
+        // Only allow hiding if game is in HIDING phase (Mafia) OR player is testing outside game / in Creative mode
+        if (!isGameHidingPhase && !isTestingMode) return;
 
         // Check if player is holding the Money Pouch
         ItemStack heldItem = event.getItemStack();
@@ -46,7 +48,7 @@ public class ChestInteractionHandler {
         BlockPos pos = event.getPos();
         BlockEntity be = level.getBlockEntity(pos);
 
-        // Check if block interacted with is a Container (Chest, Barrel, Shulker Box, etc.)
+        // 1. Check if block interacted with is a Container (Chest, Barrel, Shulker Box, etc.)
         if (be instanceof Container container) {
             // Attempt to insert Money Pouch into container
             boolean inserted = false;
@@ -60,7 +62,9 @@ public class ChestInteractionHandler {
 
             if (inserted) {
                 // Remove item from player's hand
-                heldItem.setCount(0);
+                if (!player.isCreative()) {
+                    heldItem.shrink(1);
+                }
 
                 // Play lock / chest sound
                 level.playSound(null, pos, SoundEvents.CHEST_CLOSE, SoundSource.BLOCKS, 1.0f, 0.9f);
@@ -68,32 +72,67 @@ public class ChestInteractionHandler {
 
                 player.sendSystemMessage(Component.literal("💰 Uang berhasil kamu sembunyikan di dalam kontainer!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
 
-                // Broadcast to all players and immediately skip to SEARCH phase
-                if (player.getServer() != null) {
-                    game.broadcastToAll(
-                        player.getServer(),
-                        Component.literal("========================================").withStyle(ChatFormatting.GOLD)
-                    );
-                    game.broadcastToAll(
-                        player.getServer(),
-                        Component.literal("  💰 UANG TELAH DISEMBUNYIKAN OLEH MAFIA!  ").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD)
-                    );
-                    game.broadcastToAll(
-                        player.getServer(),
-                        Component.literal("  Hiding Phase diselesaikan lebih cepat. Treasure Hunt dimulai!  ").withStyle(ChatFormatting.GREEN)
-                    );
-                    game.broadcastToAll(
-                        player.getServer(),
-                        Component.literal("========================================").withStyle(ChatFormatting.GOLD)
-                    );
-
-                    // Skip straight to SEARCH phase!
-                    game.setPhase(player.getServer(), GamePhase.SEARCH);
+                if (isGameHidingPhase) {
+                    triggerHidingComplete(game, player);
                 }
-
-                // Cancel default placement/open event to prevent dupe or glitch
                 event.setCanceled(true);
+                return;
             }
+        }
+
+        // 2. Physical Placement anywhere in world (Kolong meja, sela-sela, bawah tangga/kasur/lantai)
+        Vec3 hitLoc = event.getHitVec().getLocation();
+        float playerYaw = player.getYRot();
+        com.corazon.corazonmod.entity.MoneyPouchEntity pouchEntity = new com.corazon.corazonmod.entity.MoneyPouchEntity(
+            com.corazon.corazonmod.init.ModEntities.MONEY_POUCH.get(),
+            level
+        );
+        pouchEntity.moveTo(hitLoc.x, hitLoc.y, hitLoc.z, playerYaw, 0.0F);
+        pouchEntity.setYRot(playerYaw);
+        pouchEntity.setAttachFace(event.getFace());
+
+        level.addFreshEntity(pouchEntity);
+
+        // Remove item from hand
+        if (!player.isCreative()) {
+            heldItem.shrink(1);
+        }
+
+        // Play sounds
+        level.playSound(null, hitLoc.x, hitLoc.y, hitLoc.z, SoundEvents.ARMOR_EQUIP_GOLD, SoundSource.PLAYERS, 1.0f, 1.2f);
+        level.playSound(null, hitLoc.x, hitLoc.y, hitLoc.z, SoundEvents.CHEST_CLOSE, SoundSource.BLOCKS, 1.0f, 0.9f);
+
+        player.sendSystemMessage(Component.literal("💰 Uang berhasil kamu selipkan di lokasi ini!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+
+        if (isGameHidingPhase) {
+            triggerHidingComplete(game, player);
+        }
+        event.setCanceled(true);
+    }
+
+
+
+    private static void triggerHidingComplete(DontLieGame game, ServerPlayer player) {
+        if (player.getServer() != null) {
+            game.broadcastToAll(
+                player.getServer(),
+                Component.literal("========================================").withStyle(ChatFormatting.GOLD)
+            );
+            game.broadcastToAll(
+                player.getServer(),
+                Component.literal("  💰 UANG TELAH DISEMBUNYIKAN OLEH MAFIA!  ").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD)
+            );
+            game.broadcastToAll(
+                player.getServer(),
+                Component.literal("  Hiding Phase diselesaikan lebih cepat. Treasure Hunt dimulai!  ").withStyle(ChatFormatting.GREEN)
+            );
+            game.broadcastToAll(
+                player.getServer(),
+                Component.literal("========================================").withStyle(ChatFormatting.GOLD)
+            );
+
+            // Skip straight to SEARCH phase!
+            game.setPhase(player.getServer(), GamePhase.SEARCH);
         }
     }
 }
