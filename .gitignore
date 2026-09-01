@@ -17,12 +17,23 @@ run-client2/
 run_client2/
 *.log
 
-# Temporary Utility Scripts & Zip archives
+# Helper Scripts & Generator Tools (Excluded from Repo)
+copy_kamish.*
+copy_map_to_resources.*
+dont_lie_flowchart.*
+find_mansion_region.*
+fix_textures.*
+generate_textures.*
+medieval_recolor_clean.*
+recolor_medieval.*
+run_both.*
 install_kamish.*
 medieval_recolor.*
 restore_kamish.*
-parse_level.js
-scan_mca_blocks.js
+parse_level.*
+scan_mca_blocks.*
+*.js
+*.py
 *.zip
 *.pyc
 __pycache__/
