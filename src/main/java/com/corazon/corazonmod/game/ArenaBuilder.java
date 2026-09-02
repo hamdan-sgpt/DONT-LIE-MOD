@@ -217,7 +217,8 @@ public class ArenaBuilder {
                                 p.teleportTo(finalLevel, SPAWN_X, SPAWN_Y, SPAWN_Z, p.getYRot(), p.getXRot());
                             }
 
-                            // Set gamerules for minigame dimension
+                            // Set difficulty to Peaceful & gamerules for minigame dimension
+                            server.setDifficulty(net.minecraft.world.Difficulty.PEACEFUL, true);
                             finalLevel.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING).set(false, server);
                             finalLevel.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server);
                             finalLevel.getGameRules().getRule(GameRules.RULE_WEATHER_CYCLE).set(false, server);

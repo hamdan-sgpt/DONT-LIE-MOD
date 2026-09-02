@@ -51,8 +51,43 @@ minecraft {
         }
 
         client2 {
-            parent runs.client
+            property 'forge.enabledGameUserdev', 'true'
             workingDirectory project.file('run-client2')
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client3 {
+            property 'forge.enabledGameUserdev', 'true'
+            workingDirectory project.file('run-client3')
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client4 {
+            property 'forge.enabledGameUserdev', 'true'
+            workingDirectory project.file('run-client4')
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client5 {
+            property 'forge.enabledGameUserdev', 'true'
+            workingDirectory project.file('run-client5')
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
         }
 
         server {

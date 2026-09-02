@@ -25,6 +25,7 @@ import net.minecraft.world.BossEvent;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 
 import java.util.*;
 
@@ -34,6 +35,7 @@ public class DontLieGame {
     private final Map<UUID, PlayerRole> playerRoles = new HashMap<>();
     private final Set<UUID> alivePlayers = new HashSet<>();
     private final Map<UUID, UUID> votes = new HashMap<>();
+    private final Set<UUID> discussionSkipVotes = new HashSet<>();
 
     private GamePhase currentPhase = GamePhase.LOBBY;
     private int phaseTimeRemaining = 0;
@@ -41,15 +43,78 @@ public class DontLieGame {
     private int hudSyncCounter = 0;
 
     private int customHidingDuration = 60;
+    private int customMinigameDuration = 45;
     private int customSearchDuration = 300;
+    private int customDiscussionDuration = 90;
+    private int customVotingDuration = 30;
+
+    private int minigameScore = 0;
+
+    private int customMafiaCount = -1;  // -1 means auto
+    private int customDoctorCount = 1;
+    private int customPoliceCount = 1;
+
+    private final Map<UUID, PlayerRole> forcedRoles = new HashMap<>();
 
     private UUID moneyHolder = null;
     private UUID mafiaTarget = null;
     private UUID doctorTarget = null;
 
-    public void setCustomDurations(int hidingSeconds, int searchSeconds) {
+    public void setCustomDurations(int hidingSeconds, int searchSeconds, int discussionSeconds, int votingSeconds) {
+        setCustomDurations(hidingSeconds, 45, searchSeconds, discussionSeconds, votingSeconds);
+    }
+
+    public void setCustomDurations(int hidingSeconds, int minigameSeconds, int searchSeconds, int discussionSeconds, int votingSeconds) {
         if (hidingSeconds > 0) this.customHidingDuration = hidingSeconds;
+        if (minigameSeconds > 0) this.customMinigameDuration = minigameSeconds;
         if (searchSeconds > 0) this.customSearchDuration = searchSeconds;
+        if (discussionSeconds > 0) this.customDiscussionDuration = discussionSeconds;
+        if (votingSeconds > 0) this.customVotingDuration = votingSeconds;
+    }
+
+    public int getCustomMinigameDuration() {
+        return customMinigameDuration;
+    }
+
+    public int getMinigameScore() {
+        return minigameScore;
+    }
+
+    public void addMinigameScore(ServerPlayer player, int points) {
+        if (currentPhase != GamePhase.MINIGAME) return;
+        minigameScore += points;
+        player.sendSystemMessage(Component.literal("🎯 + " + points + " Poin Minigame! Total Skor Kelompok: " + minigameScore).withStyle(ChatFormatting.LIGHT_PURPLE));
+        player.level().playSound(null, player.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.MASTER, 0.8f, 1.2f);
+    }
+
+    public void setCustomRoleCounts(int mafiaCount, int doctorCount, int policeCount) {
+        this.customMafiaCount = mafiaCount;
+        this.customDoctorCount = doctorCount;
+        this.customPoliceCount = policeCount;
+    }
+
+    public int getCustomMafiaCount() { return customMafiaCount; }
+    public int getCustomDoctorCount() { return customDoctorCount; }
+    public int getCustomPoliceCount() { return customPoliceCount; }
+
+    public void setPlayerForcedRole(UUID playerUUID, PlayerRole role) {
+        if (role == null) {
+            forcedRoles.remove(playerUUID);
+        } else {
+            forcedRoles.put(playerUUID, role);
+        }
+    }
+
+    public PlayerRole getForcedRole(UUID playerUUID) {
+        return forcedRoles.get(playerUUID);
+    }
+
+    public Map<UUID, PlayerRole> getForcedRoles() {
+        return Collections.unmodifiableMap(forcedRoles);
+    }
+
+    public void clearForcedRoles() {
+        forcedRoles.clear();
     }
 
     public int getCustomHidingDuration() {
@@ -60,8 +125,71 @@ public class DontLieGame {
         return customSearchDuration;
     }
 
+    public int getCustomDiscussionDuration() {
+        return customDiscussionDuration;
+    }
+
+    public int getCustomVotingDuration() {
+        return customVotingDuration;
+    }
+
+    private final Set<UUID> registeredPlayers = new LinkedHashSet<>();
     private ServerBossEvent bossBar;
     private final Set<UUID> allPlayerUUIDs = new HashSet<>();
+
+    public boolean registerPlayer(ServerPlayer player) {
+        if (isGameRunning()) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ❌ Game sedang berjalan! Tidak bisa mendaftar sekarang.").withStyle(ChatFormatting.RED));
+            return false;
+        }
+        if (registeredPlayers.contains(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ℹ️ Kamu sudah terdaftar sebagai peserta!").withStyle(ChatFormatting.YELLOW));
+            return false;
+        }
+        registeredPlayers.add(player.getUUID());
+        player.sendSystemMessage(Component.literal("[Don't Lie] ✅ Kamu berhasil mendaftar sebagai peserta game! (Total terdaftar: " + registeredPlayers.size() + ")").withStyle(ChatFormatting.GREEN));
+        broadcastToAll(player.server, Component.literal("📝 " + player.getScoreboardName() + " telah mendaftar sebagai peserta! (" + registeredPlayers.size() + " pemain)").withStyle(ChatFormatting.AQUA));
+        return true;
+    }
+
+    public boolean unregisterPlayer(ServerPlayer player) {
+        if (isGameRunning()) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ❌ Game sedang berjalan! Tidak bisa membatalkan pendaftaran.").withStyle(ChatFormatting.RED));
+            return false;
+        }
+        if (!registeredPlayers.contains(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ℹ️ Kamu belum terdaftar.").withStyle(ChatFormatting.YELLOW));
+            return false;
+        }
+        registeredPlayers.remove(player.getUUID());
+        player.sendSystemMessage(Component.literal("[Don't Lie] ❌ Kamu telah membatalkan pendaftaran peserta.").withStyle(ChatFormatting.RED));
+        broadcastToAll(player.server, Component.literal("📝 " + player.getScoreboardName() + " keluar dari pendaftaran peserta. (" + registeredPlayers.size() + " pemain)").withStyle(ChatFormatting.GRAY));
+        return true;
+    }
+
+    public boolean isRegistered(UUID uuid) {
+        return registeredPlayers.contains(uuid);
+    }
+
+    public int getRegisteredPlayersCount() {
+        return registeredPlayers.size();
+    }
+
+    public void clearRegisteredPlayers(MinecraftServer server) {
+        registeredPlayers.clear();
+        broadcastToAll(server, Component.literal("[Don't Lie] 🧹 Daftar pendaftaran peserta telah dikosongkan oleh Admin.").withStyle(ChatFormatting.YELLOW));
+    }
+
+    public List<ServerPlayer> getRegisteredOnlinePlayers(MinecraftServer server) {
+        List<ServerPlayer> list = new ArrayList<>();
+        for (UUID uuid : registeredPlayers) {
+            ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+            if (p != null) {
+                list.add(p);
+            }
+        }
+        return list;
+    }
 
     public static DontLieGame getInstance() {
         return INSTANCE;
@@ -99,18 +227,30 @@ public class DontLieGame {
         return phaseTimeRemaining;
     }
 
-    public void startNewGame(MinecraftServer server, List<ServerPlayer> players) {
+    public void startNewGame(MinecraftServer server, List<ServerPlayer> inputPlayers) {
+        List<ServerPlayer> players = inputPlayers;
+        if (players == null || players.isEmpty()) {
+            if (!registeredPlayers.isEmpty()) {
+                players = getRegisteredOnlinePlayers(server);
+                broadcastToAll(server, Component.literal("[Don't Lie] 📝 Memulai game dengan " + players.size() + " pemain terdaftar!").withStyle(ChatFormatting.GOLD));
+            } else {
+                players = new ArrayList<>(server.getPlayerList().getPlayers());
+                broadcastToAll(server, Component.literal("[Don't Lie] ⚠️ Tidak ada pendaftaran khusus. Memulai game dengan SEMUA pemain online (" + players.size() + " pemain).").withStyle(ChatFormatting.YELLOW));
+            }
+        }
+
         if (players.size() < 2) {
-            broadcastToAll(server, Component.literal("[Don't Lie] Minimal 2 pemain untuk memulai game!").withStyle(ChatFormatting.RED));
+            broadcastToAll(server, Component.literal("[Don't Lie] ❌ Minimal 2 pemain terdaftar yang online untuk memulai game!").withStyle(ChatFormatting.RED));
             return;
         }
 
-        // Teleport all participants to Don't Lie dimension & discussion seats
+        // Teleport all participants to Don't Lie dimension & discussion seats and set to Adventure Mode
         ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
         List<com.corazon.corazonmod.config.ArenaConfigManager.PosData> seats = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getDiscussionSeats();
-        if (dontLieLevel != null) {
-            int seatIdx = 0;
-            for (ServerPlayer p : players) {
+        int seatIdx = 0;
+        for (ServerPlayer p : players) {
+            p.setGameMode(GameType.ADVENTURE);
+            if (dontLieLevel != null) {
                 if (!seats.isEmpty()) {
                     var seat = seats.get(seatIdx % seats.size());
                     p.teleportTo(dontLieLevel, seat.x, seat.y, seat.z, seat.yaw, seat.pitch);
@@ -129,51 +269,62 @@ public class DontLieGame {
         mafiaTarget = null;
         doctorTarget = null;
 
-        // Shuffle players and assign roles
-        List<ServerPlayer> shuffled = new ArrayList<>(players);
-        Collections.shuffle(shuffled);
+        // Determine targeted role counts
+        int totalCount = players.size();
+        int targetMafia = (customMafiaCount >= 0) ? customMafiaCount : Math.max(1, Math.min(3, totalCount / 3));
+        int targetDoctor = (customDoctorCount >= 0) ? customDoctorCount : 1;
+        int targetPolice = (customPoliceCount >= 0) ? customPoliceCount : 1;
 
-        int mafiaCount = Math.max(1, Math.min(3, shuffled.size() / 3));
-        int index = 0;
+        List<ServerPlayer> unassignedPlayers = new ArrayList<>();
 
-        // Assign Mafias
-        for (int i = 0; i < mafiaCount; i++) {
-            ServerPlayer p = shuffled.get(index++);
+        // First pass: assign forced roles for players who have a forced role configured
+        for (ServerPlayer p : players) {
+            UUID uuid = p.getUUID();
+            alivePlayers.add(uuid);
+            allPlayerUUIDs.add(uuid);
+
+            if (forcedRoles.containsKey(uuid)) {
+                PlayerRole forcedRole = forcedRoles.get(uuid);
+                playerRoles.put(uuid, forcedRole);
+
+                // Reduce needed count for this role
+                switch (forcedRole) {
+                    case MAFIA -> targetMafia = Math.max(0, targetMafia - 1);
+                    case DOCTOR -> targetDoctor = Math.max(0, targetDoctor - 1);
+                    case POLICE -> targetPolice = Math.max(0, targetPolice - 1);
+                    default -> {}
+                }
+            } else {
+                unassignedPlayers.add(p);
+            }
+        }
+
+        // Shuffle remaining unassigned players
+        Collections.shuffle(unassignedPlayers);
+        int unassignedIdx = 0;
+
+        // Fill remaining MAFIA quota
+        for (int i = 0; i < targetMafia && unassignedIdx < unassignedPlayers.size(); i++) {
+            ServerPlayer p = unassignedPlayers.get(unassignedIdx++);
             playerRoles.put(p.getUUID(), PlayerRole.MAFIA);
-            alivePlayers.add(p.getUUID());
-            allPlayerUUIDs.add(p.getUUID());
         }
 
-        // Assign Doctor
-        if (index < shuffled.size()) {
-            ServerPlayer p = shuffled.get(index++);
+        // Fill remaining DOCTOR quota
+        for (int i = 0; i < targetDoctor && unassignedIdx < unassignedPlayers.size(); i++) {
+            ServerPlayer p = unassignedPlayers.get(unassignedIdx++);
             playerRoles.put(p.getUUID(), PlayerRole.DOCTOR);
-            alivePlayers.add(p.getUUID());
-            allPlayerUUIDs.add(p.getUUID());
         }
 
-        // Assign Police
-        if (index < shuffled.size()) {
-            ServerPlayer p = shuffled.get(index++);
+        // Fill remaining POLICE quota
+        for (int i = 0; i < targetPolice && unassignedIdx < unassignedPlayers.size(); i++) {
+            ServerPlayer p = unassignedPlayers.get(unassignedIdx++);
             playerRoles.put(p.getUUID(), PlayerRole.POLICE);
-            alivePlayers.add(p.getUUID());
-            allPlayerUUIDs.add(p.getUUID());
         }
 
-        // Assign Broker (if 7+ players)
-        if (shuffled.size() >= 7 && index < shuffled.size()) {
-            ServerPlayer p = shuffled.get(index++);
-            playerRoles.put(p.getUUID(), PlayerRole.BROKER);
-            alivePlayers.add(p.getUUID());
-            allPlayerUUIDs.add(p.getUUID());
-        }
-
-        // Assign Citizens for the rest
-        while (index < shuffled.size()) {
-            ServerPlayer p = shuffled.get(index++);
+        // Assign CITIZEN for all remaining unassigned players
+        while (unassignedIdx < unassignedPlayers.size()) {
+            ServerPlayer p = unassignedPlayers.get(unassignedIdx++);
             playerRoles.put(p.getUUID(), PlayerRole.CITIZEN);
-            alivePlayers.add(p.getUUID());
-            allPlayerUUIDs.add(p.getUUID());
         }
 
         // Give Money Pouch to one of the Mafias to hide
@@ -189,21 +340,8 @@ public class DontLieGame {
             moneyMafia.sendSystemMessage(Component.literal("💰 Uang (Money Pouch) ada di inventaris kamu! Sembunyikan di dalam chest selama Hiding Phase!").withStyle(ChatFormatting.GOLD));
         }
 
-        // Give Mafia Dagger to all Mafias
-        for (ServerPlayer p : players) {
-            if (getRole(p.getUUID()) == PlayerRole.MAFIA) {
-                p.getInventory().add(new ItemStack(ModItems.MAFIA_DAGGER.get()));
-            }
-        }
-
-        // Initialize BossBar
-        if (bossBar != null) {
-            bossBar.removeAllPlayers();
-        }
-        bossBar = new ServerBossEvent(Component.literal("GOING SEVENTEEN: DON'T LIE"), BossEvent.BossBarColor.RED, BossEvent.BossBarOverlay.PROGRESS);
-        for (ServerPlayer p : players) {
-            bossBar.addPlayer(p);
-        }
+        // *** Remove any Daggers from all players at game start ***
+        removeMafiaDaggers(server);
 
         // *** Send Role Reveal GUI packet to each player ***
         for (ServerPlayer p : players) {
@@ -225,21 +363,22 @@ public class DontLieGame {
         broadcastToAll(server, Component.literal("  Role rahasia telah dibagikan!  ").withStyle(ChatFormatting.AQUA));
         broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
 
-        // Start Hiding Phase with blindness for citizens and speed for mafia
+        // Set server difficulty to Peaceful & start Hiding Phase
+        server.setDifficulty(net.minecraft.world.Difficulty.PEACEFUL, true);
         setPhase(server, GamePhase.HIDING);
     }
 
     public void stopGame(MinecraftServer server) {
         currentPhase = GamePhase.ENDED;
-        if (bossBar != null) {
-            bossBar.removeAllPlayers();
-            bossBar = null;
-        }
+        removeMafiaDaggers(server);
 
-        // Remove effects from all players
+        // Remove effects and reset gamemode to Survival for all players
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             p.removeEffect(MobEffects.BLINDNESS);
             p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+            if (isParticipant(p.getUUID())) {
+                p.setGameMode(GameType.SURVIVAL);
+            }
         }
 
         // Send game ended state to clients
@@ -252,29 +391,71 @@ public class DontLieGame {
         phaseTimeRemaining += seconds;
     }
 
+    public void voteSkipDiscussion(ServerPlayer player) {
+        if (!isGameRunning() || currentPhase != GamePhase.DISCUSSION) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ⚠️ Usulan lewati diskusi hanya bisa dilakukan saat Fase Diskusi!").withStyle(ChatFormatting.RED));
+            return;
+        }
+        if (!isParticipant(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ⚠️ Hanya peserta game yang bisa memilih lewati diskusi.").withStyle(ChatFormatting.RED));
+            return;
+        }
+        if (!isAlive(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ⚠️ Pemain yang gugur tidak bisa memilih.").withStyle(ChatFormatting.RED));
+            return;
+        }
+        if (discussionSkipVotes.contains(player.getUUID())) {
+            player.sendSystemMessage(Component.literal("[Don't Lie] ℹ️ Kamu sudah menyetujui untuk melewati fase diskusi.").withStyle(ChatFormatting.YELLOW));
+            return;
+        }
+
+        discussionSkipVotes.add(player.getUUID());
+        int count = discussionSkipVotes.size();
+        int needed = getAliveCount();
+
+        broadcastToAll(player.server, Component.literal("⏩ " + player.getScoreboardName() + " ingin melewati fase Diskusi! (" + count + "/" + needed + " pemain setuju)").withStyle(ChatFormatting.GOLD));
+
+        if (count >= needed) {
+            broadcastToAll(player.server, Component.literal("⏩ SEMUA PEMAIN SETUJU! Fase Diskusi dilewati.").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+            advancePhase(player.server);
+        }
+    }
+
+    public void skipCurrentPhase(MinecraftServer server) {
+        if (!isGameRunning()) return;
+        broadcastToAll(server, Component.literal("[Don't Lie] ⏩ Fase " + currentPhase.getDisplayName() + " dipaksa lewat oleh Admin!").withStyle(ChatFormatting.YELLOW));
+        advancePhase(server);
+    }
+
     public void setPhase(MinecraftServer server, GamePhase phase) {
         this.currentPhase = phase;
+        removeMafiaDaggers(server);
         if (phase == GamePhase.HIDING && customHidingDuration > 0) {
             this.phaseTimeRemaining = customHidingDuration;
+        } else if (phase == GamePhase.MINIGAME && customMinigameDuration > 0) {
+            this.phaseTimeRemaining = customMinigameDuration;
         } else if (phase == GamePhase.SEARCH && customSearchDuration > 0) {
             this.phaseTimeRemaining = customSearchDuration;
+        } else if (phase == GamePhase.DISCUSSION && customDiscussionDuration > 0) {
+            this.phaseTimeRemaining = customDiscussionDuration;
+        } else if (phase == GamePhase.VOTING && customVotingDuration > 0) {
+            this.phaseTimeRemaining = customVotingDuration;
         } else {
             this.phaseTimeRemaining = phase.getDefaultDurationSeconds();
         }
         this.votes.clear();
+        this.discussionSkipVotes.clear();
         this.mafiaTarget = null;
         this.doctorTarget = null;
-
-        if (bossBar != null) {
-            bossBar.setColor(getBossBarColor(phase));
-        }
 
         // Play phase transition sounds
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (isParticipant(p.getUUID())) {
                 switch (phase) {
+                    case MINIGAME -> p.level().playSound(null, p.blockPosition(), SoundEvents.PLAYER_LEVELUP, SoundSource.MASTER, 1.0f, 1.0f);
                     case SEARCH -> p.level().playSound(null, p.blockPosition(), SoundEvents.RAID_HORN.value(), SoundSource.MASTER, 0.8f, 1.2f);
-                    case VOTING -> p.level().playSound(null, p.blockPosition(), SoundEvents.BELL_BLOCK, SoundSource.MASTER, 1.0f, 1.0f);
+                    case DISCUSSION -> p.level().playSound(null, p.blockPosition(), SoundEvents.BELL_BLOCK, SoundSource.MASTER, 1.0f, 1.0f);
+                    case VOTING -> p.level().playSound(null, p.blockPosition(), SoundEvents.VILLAGER_WORK_CARTOGRAPHER, SoundSource.MASTER, 1.0f, 1.2f);
                     case NIGHT -> p.level().playSound(null, p.blockPosition(), SoundEvents.AMBIENT_CAVE.value(), SoundSource.MASTER, 1.0f, 0.6f);
                 }
             }
@@ -291,10 +472,24 @@ public class DontLieGame {
             }
         }
 
-        // Handle Hiding and Night Phase effects
-        if (phase == GamePhase.HIDING) {
+        // Notify Simple Voice Chat Integration
+        com.corazon.corazonmod.integration.VoiceChatIntegration.onPhaseChange(server, phase);
+
+        // Handle Phase-specific behaviors & effects
+        if (phase == GamePhase.MINIGAME) {
+            this.minigameScore = 0;
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                    p.removeEffect(MobEffects.BLINDNESS);
+                    p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                    p.removeEffect(MobEffects.MOVEMENT_SPEED);
+                }
+            }
+        } else if (phase == GamePhase.HIDING) {
+            hidingStartPositions.clear();
+            for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                    hidingStartPositions.put(p.getUUID(), new PlayerPos(p.getX(), p.getY(), p.getZ(), p.getYRot(), p.getXRot()));
                     PlayerRole role = getRole(p.getUUID());
                     if (role != PlayerRole.MAFIA) {
                         // Citizens/Doctor/Police close their eyes (Blindness) & frozen in place
@@ -307,58 +502,46 @@ public class DontLieGame {
                 }
             }
         } else if (phase == GamePhase.NIGHT) {
-            for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-                if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
-                    PlayerRole role = getRole(p.getUUID());
-                    if (role != PlayerRole.MAFIA) {
-                        // Citizens get blindness
-                        p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, phase.getDefaultDurationSeconds() * 20, 1, false, false));
-                        p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, phase.getDefaultDurationSeconds() * 20, 2, false, false));
-                    }
-
-                    // *** Open Night Action GUI for special roles ***
-                    switch (role) {
-                        case MAFIA -> ModMessages.sendToPlayer(new OpenNightActionPacket("MAFIA_KILL", getAlivePlayerEntries(server, p.getUUID(), false)), p);
-                        case DOCTOR -> ModMessages.sendToPlayer(new OpenNightActionPacket("DOCTOR_SAVE", getAlivePlayerEntries(server, p.getUUID(), true)), p);
-                        case POLICE -> ModMessages.sendToPlayer(new OpenNightActionPacket("POLICE_CHECK", getAlivePlayerEntries(server, p.getUUID(), false)), p);
-                    }
-                }
-            }
-        } else if (phase == GamePhase.VOTING) {
-            // Teleport all alive players to their respective seats at the Discussion/Meeting table
+            this.nightSubPhase = 0;
+            startNightSubPhase(server);
+        } else if (phase == GamePhase.DISCUSSION) {
+            // Teleport all alive players to their seats at Discussion table & freeze them in place
             List<com.corazon.corazonmod.config.ArenaConfigManager.PosData> seats = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getDiscussionSeats();
             ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
             
             int seatIndex = 0;
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                    p.removeEffect(MobEffects.BLINDNESS);
+                    p.removeEffect(MobEffects.MOVEMENT_SPEED);
+                    p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, phaseTimeRemaining * 20, 255, false, false));
+
                     if (dontLieLevel != null && !seats.isEmpty()) {
                         com.corazon.corazonmod.config.ArenaConfigManager.PosData seat = seats.get(seatIndex % seats.size());
                         p.teleportTo(dontLieLevel, seat.x, seat.y, seat.z, seat.yaw, seat.pitch);
                         seatIndex++;
                     }
-                    // *** Open Voting GUI for all alive players (including self-vote option) ***
+                }
+            }
+        } else if (phase == GamePhase.VOTING) {
+            // Freeze players in place & Open Voting GUI for all alive players
+            for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                    p.removeEffect(MobEffects.BLINDNESS);
+                    p.removeEffect(MobEffects.MOVEMENT_SPEED);
+                    p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, phaseTimeRemaining * 20, 255, false, false));
+
                     List<OpenVotingScreenPacket.PlayerEntry> targets = getAlivePlayerEntries(server, p.getUUID(), true);
                     ModMessages.sendToPlayer(new OpenVotingScreenPacket(targets), p);
                 }
             }
         } else if (phase == GamePhase.SEARCH) {
-            // Teleport Mafia and all alive players back to their seats at the Discussion table
-            List<com.corazon.corazonmod.config.ArenaConfigManager.PosData> seats = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getDiscussionSeats();
-            ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
-
-            int seatIndex = 0;
+            // Unfreeze all players so they can search freely
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
                     p.removeEffect(MobEffects.BLINDNESS);
                     p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
                     p.removeEffect(MobEffects.MOVEMENT_SPEED);
-
-                    if (dontLieLevel != null && !seats.isEmpty()) {
-                        com.corazon.corazonmod.config.ArenaConfigManager.PosData seat = seats.get(seatIndex % seats.size());
-                        p.teleportTo(dontLieLevel, seat.x, seat.y, seat.z, seat.yaw, seat.pitch);
-                        seatIndex++;
-                    }
                 }
             }
         } else {
@@ -367,6 +550,101 @@ public class DontLieGame {
                 p.removeEffect(MobEffects.BLINDNESS);
                 p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
                 p.removeEffect(MobEffects.MOVEMENT_SPEED);
+            }
+        }
+    }
+
+    public static class PlayerPos {
+        public final double x, y, z;
+        public final float yaw, pitch;
+        public PlayerPos(double x, double y, double z, float yaw, float pitch) {
+            this.x = x; this.y = y; this.z = z; this.yaw = yaw; this.pitch = pitch;
+        }
+    }
+
+    private final Map<UUID, PlayerPos> hidingStartPositions = new HashMap<>();
+
+    public void returnMafiaToStartPos(ServerPlayer mafia) {
+        if (mafia == null) return;
+        PlayerPos startPos = hidingStartPositions.get(mafia.getUUID());
+        if (startPos != null) {
+            mafia.teleportTo((ServerLevel) mafia.level(), startPos.x, startPos.y, startPos.z, startPos.yaw, startPos.pitch);
+            mafia.sendSystemMessage(Component.literal("↩️ Kamu telah dikembalikan ke posisi awal agar tidak dicurigai pemain lain!").withStyle(ChatFormatting.GREEN));
+        }
+    }
+
+    private int nightSubPhase = 0; // 0: Mafia, 1: Doctor, 2: Police
+
+    public int getNightSubPhase() {
+        return nightSubPhase;
+    }
+
+    public void advanceNightTurn(MinecraftServer server) {
+        if (currentPhase != GamePhase.NIGHT) return;
+        if (nightSubPhase < 2) {
+            nightSubPhase++;
+            startNightSubPhase(server);
+        } else {
+            nightSubPhase = 0;
+            resolveNightActions(server);
+            if (checkWinConditions(server)) return;
+            setPhase(server, GamePhase.SEARCH);
+        }
+    }
+
+    public void startNightSubPhase(MinecraftServer server) {
+        removeMafiaDaggers(server);
+        this.phaseTimeRemaining = 15;
+
+        PlayerRole activeRole = switch (nightSubPhase) {
+            case 0 -> PlayerRole.MAFIA;
+            case 1 -> PlayerRole.DOCTOR;
+            case 2 -> PlayerRole.POLICE;
+            default -> PlayerRole.MAFIA;
+        };
+
+        String titleText = switch (nightSubPhase) {
+            case 0 -> "🔪 MALAM HARI: MAFIA TURN";
+            case 1 -> "🛡️ MALAM HARI: DOCTOR TURN";
+            case 2 -> "🔍 MALAM HARI: POLICE TURN";
+            default -> "🌙 MALAM HARI";
+        };
+
+        String subtitleText = switch (nightSubPhase) {
+            case 0 -> "Mafia tentukan target eksekusi...";
+            case 1 -> "Doctor pilih pemain yang dilindungi...";
+            case 2 -> "Police selidiki identitas pemain...";
+            default -> "";
+        };
+
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (isParticipant(p.getUUID())) {
+                PlayerRole role = getRole(p.getUUID());
+                p.connection.send(new ClientboundSetTitlesAnimationPacket(5, 30, 5));
+                p.connection.send(new ClientboundSetTitleTextPacket(Component.literal(titleText).withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)));
+                p.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal(subtitleText).withStyle(ChatFormatting.GRAY)));
+
+                if (isAlive(p.getUUID())) {
+                    if (role == activeRole) {
+                        // Eyes open for active turn role
+                        p.removeEffect(MobEffects.BLINDNESS);
+                        p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                        p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 15 * 20, 255, false, false));
+
+                        if (role == PlayerRole.MAFIA) {
+                            p.getInventory().add(new ItemStack(ModItems.MAFIA_DAGGER.get()));
+                            p.sendSystemMessage(Component.literal("🔪 [MALAM HARI] Dagger Mafia diberikan! Pukul/klik pemain lain di dunia untuk mengeksekusi!").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD));
+                        } else if (role == PlayerRole.DOCTOR) {
+                            p.sendSystemMessage(Component.literal("🛡️ [MALAM HARI] Giliran Doctor! Pukul/klik pemain lain (atau klik kanan untuk diri sendiri) untuk melindungi!").withStyle(ChatFormatting.BLUE, ChatFormatting.BOLD));
+                        } else if (role == PlayerRole.POLICE) {
+                            p.sendSystemMessage(Component.literal("🔍 [MALAM HARI] Giliran Police! Pukul/klik pemain lain untuk menyelidiki identitasnya!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+                        }
+                    } else {
+                        // Eyes closed for non-active roles
+                        p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 15 * 20, 1, false, false));
+                        p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 15 * 20, 255, false, false));
+                    }
+                }
             }
         }
     }
@@ -397,12 +675,7 @@ public class DontLieGame {
                 }
             }
 
-            // Update BossBar
-            if (bossBar != null) {
-                float progress = Math.max(0.0f, Math.min(1.0f, (float) phaseTimeRemaining / Math.max(1, currentPhase.getDefaultDurationSeconds())));
-                bossBar.setProgress(progress);
-                bossBar.setName(Component.literal("[" + currentPhase.getDisplayName() + "] Sisa Waktu: " + formatTime(phaseTimeRemaining)));
-            }
+
 
             // Phase Timer Expired
             if (phaseTimeRemaining <= 0) {
@@ -412,11 +685,21 @@ public class DontLieGame {
     }
 
     private void syncGameStateToAll(MinecraftServer server) {
+        String phaseDisplayName = currentPhase.getDisplayName();
+        if (currentPhase == GamePhase.NIGHT) {
+            phaseDisplayName = switch (nightSubPhase) {
+                case 0 -> "Night: Mafia Turn";
+                case 1 -> "Night: Doctor Turn";
+                case 2 -> "Night: Police Turn";
+                default -> "Night Elimination";
+            };
+        }
+
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (isParticipant(p.getUUID())) {
                 PlayerRole role = getRole(p.getUUID());
                 ModMessages.sendToPlayer(new GameStateUpdatePacket(
-                    currentPhase.getDisplayName(),
+                    phaseDisplayName,
                     currentPhase.getColor().getColor(),
                     role.getDisplayName(),
                     role.getColor().getColor(),
@@ -449,26 +732,73 @@ public class DontLieGame {
     private String getPhaseHint(GamePhase phase) {
         return switch (phase) {
             case HIDING -> "Mafia sedang menyembunyikan uang di dalam arena!";
+            case MINIGAME -> "MINIGAME! Kumpulkan poin kelompok untuk memenangkan ekstra waktu pencarian!";
             case SEARCH -> "CARI UANG! Periksa semua chest dan sudut ruangan!";
-            case VOTING -> "Kumpul di Meeting Room! Diskusi dan voting Mafia!";
-            case NIGHT -> "Malam tiba. Mafia, Doctor, dan Police beraksi...";
+            case DISCUSSION -> "Kumpul di Meeting Room! Diskusi & Berinterogasi!";
+            case VOTING -> "SAATNYA VOTING! Pilih pemain yang dicurigai sebagai Mafia!";
+            case NIGHT -> "Malam tiba. Special roles beraksi secara bergantian...";
             default -> "";
         };
     }
 
     private void advancePhase(MinecraftServer server) {
         switch (currentPhase) {
-            case HIDING -> setPhase(server, GamePhase.SEARCH);
-            case SEARCH -> setPhase(server, GamePhase.VOTING);
+            case HIDING -> {
+                for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                    if (isParticipant(p.getUUID()) && getRole(p.getUUID()) == PlayerRole.MAFIA) {
+                        returnMafiaToStartPos(p);
+                    }
+                }
+                setPhase(server, GamePhase.MINIGAME);
+            }
+            case MINIGAME -> {
+                int extraSeconds = 0;
+                if (minigameScore >= 15) {
+                    extraSeconds = 90;
+                } else if (minigameScore >= 10) {
+                    extraSeconds = 60;
+                } else if (minigameScore >= 5) {
+                    extraSeconds = 30;
+                }
+
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+                broadcastToAll(server, Component.literal("  🎯 FASE MINIGAME SELESAI!  ").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
+                broadcastToAll(server, Component.literal("  Total Skor Kelompok: " + minigameScore + " Poin  ").withStyle(ChatFormatting.YELLOW));
+                if (extraSeconds > 0) {
+                    broadcastToAll(server, Component.literal("  🎉 BONUS WAKTU PENCARIAN: +" + extraSeconds + " DETIK!  ").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+                } else {
+                    broadcastToAll(server, Component.literal("  ⚠️ Skor kelompok belum cukup untuk bonus waktu ekstra (butuh 5+ poin).  ").withStyle(ChatFormatting.RED));
+                }
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+
+                for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                    if (isParticipant(p.getUUID())) {
+                        p.level().playSound(null, p.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
+                    }
+                }
+
+                setPhase(server, GamePhase.SEARCH);
+                if (extraSeconds > 0) {
+                    addTime(extraSeconds);
+                }
+            }
+            case SEARCH -> setPhase(server, GamePhase.DISCUSSION);
+            case DISCUSSION -> setPhase(server, GamePhase.VOTING);
             case VOTING -> {
                 resolveVoting(server);
                 if (checkWinConditions(server)) return;
                 setPhase(server, GamePhase.NIGHT);
             }
             case NIGHT -> {
-                resolveNightActions(server);
-                if (checkWinConditions(server)) return;
-                setPhase(server, GamePhase.SEARCH);
+                if (nightSubPhase < 2) {
+                    nightSubPhase++;
+                    startNightSubPhase(server);
+                } else {
+                    nightSubPhase = 0;
+                    resolveNightActions(server);
+                    if (checkWinConditions(server)) return;
+                    setPhase(server, GamePhase.SEARCH);
+                }
             }
         }
     }
@@ -551,6 +881,7 @@ public class DontLieGame {
             ServerPlayer eliminated = server.getPlayerList().getPlayer(highestVoted);
             if (eliminated != null) {
                 alivePlayers.remove(highestVoted);
+                eliminated.setGameMode(GameType.SPECTATOR);
                 PlayerRole role = getRole(highestVoted);
 
                 // Dramatic elimination title
@@ -606,6 +937,10 @@ public class DontLieGame {
         doctor.sendSystemMessage(Component.literal("🛡️ Kamu melindungi: " + target.getScoreboardName() + " malam ini.").withStyle(ChatFormatting.BLUE));
     }
 
+    public void setPoliceCheck(ServerPlayer police, ServerPlayer target) {
+        policeInspect(police, target);
+    }
+
     public void policeInspect(ServerPlayer police, ServerPlayer target) {
         if (currentPhase != GamePhase.NIGHT) {
             police.sendSystemMessage(Component.literal("Pemeriksaan Police hanya bisa dilakukan di malam hari!").withStyle(ChatFormatting.RED));
@@ -646,6 +981,7 @@ public class DontLieGame {
                 ServerPlayer victim = server.getPlayerList().getPlayer(mafiaTarget);
                 if (victim != null) {
                     alivePlayers.remove(mafiaTarget);
+                    victim.setGameMode(GameType.SPECTATOR);
 
                     // Dramatic death announcement with title
                     for (ServerPlayer p : server.getPlayerList().getPlayers()) {
@@ -681,15 +1017,13 @@ public class DontLieGame {
 
         if (livingMafia == 0) {
             currentPhase = GamePhase.ENDED;
-            if (bossBar != null) {
-                bossBar.removeAllPlayers();
-                bossBar = null;
-            }
+            removeMafiaDaggers(server);
 
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 if (isParticipant(p.getUUID())) {
                     p.removeEffect(MobEffects.BLINDNESS);
                     p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                    p.setGameMode(GameType.SURVIVAL);
                     p.connection.send(new ClientboundSetTitlesAnimationPacket(10, 100, 20));
                     p.connection.send(new ClientboundSetTitleTextPacket(
                         Component.literal("🎉 CITIZENS WIN! 🎉").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD)));
@@ -705,15 +1039,13 @@ public class DontLieGame {
 
         if (livingMafia >= livingCitizens) {
             currentPhase = GamePhase.ENDED;
-            if (bossBar != null) {
-                bossBar.removeAllPlayers();
-                bossBar = null;
-            }
+            removeMafiaDaggers(server);
 
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 if (isParticipant(p.getUUID())) {
                     p.removeEffect(MobEffects.BLINDNESS);
                     p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                    p.setGameMode(GameType.SURVIVAL);
                     p.connection.send(new ClientboundSetTitlesAnimationPacket(10, 100, 20));
                     p.connection.send(new ClientboundSetTitleTextPacket(
                         Component.literal("🔪 MAFIA WIN! 🔪").withStyle(ChatFormatting.RED, ChatFormatting.BOLD)));
@@ -733,6 +1065,18 @@ public class DontLieGame {
     public void broadcastToAll(MinecraftServer server, Component message) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             player.sendSystemMessage(message);
+        }
+    }
+
+    public void removeMafiaDaggers(MinecraftServer server) {
+        if (server == null) return;
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
+                ItemStack stack = p.getInventory().getItem(i);
+                if (!stack.isEmpty() && stack.is(ModItems.MAFIA_DAGGER.get())) {
+                    p.getInventory().setItem(i, ItemStack.EMPTY);
+                }
+            }
         }
     }
 

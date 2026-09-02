@@ -6,8 +6,7 @@ public enum PlayerRole {
     CITIZEN("Citizen", ChatFormatting.GREEN, "Cari uang dan temukan Mafia melalui voting!"),
     MAFIA("Mafia", ChatFormatting.RED, "Sembunyikan uang dan habisi para Citizen di malam hari!"),
     DOCTOR("Doctor", ChatFormatting.BLUE, "Selamatkan 1 pemain dari serangan Mafia setiap malam!"),
-    POLICE("Police", ChatFormatting.GOLD, "Periksa peran 1 pemain setiap malam!"),
-    BROKER("Broker", ChatFormatting.LIGHT_PURPLE, "Lacak informasi rahasia posisi uang!");
+    POLICE("Police", ChatFormatting.GOLD, "Periksa peran 1 pemain setiap malam!");
 
     private final String displayName;
     private final ChatFormatting color;

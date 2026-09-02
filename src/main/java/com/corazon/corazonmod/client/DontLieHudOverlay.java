@@ -35,11 +35,37 @@ public class DontLieHudOverlay {
         // ==========================================
         // === CUSTOM EYE CLOSING ANIMATION OVERLAY ===
         // ==========================================
-        boolean isHidingPhase = "Money Hiding Phase".equals(ClientPacketHandler.currentPhaseName);
-        boolean isNightPhase = "Night Elimination".equals(ClientPacketHandler.currentPhaseName);
-        boolean isMafia = "Mafia".equalsIgnoreCase(ClientPacketHandler.currentRoleName);
+        boolean isHidingPhase = "Money Hiding Phase".equalsIgnoreCase(ClientPacketHandler.currentPhaseName);
+        boolean isNightMafia = "Night: Mafia Turn".equalsIgnoreCase(ClientPacketHandler.currentPhaseName);
+        boolean isNightDoctor = "Night: Doctor Turn".equalsIgnoreCase(ClientPacketHandler.currentPhaseName);
+        boolean isNightPolice = "Night: Police Turn".equalsIgnoreCase(ClientPacketHandler.currentPhaseName);
+        boolean isNightGeneric = "Night Elimination".equalsIgnoreCase(ClientPacketHandler.currentPhaseName);
 
-        boolean shouldCloseEyes = ClientPacketHandler.isInGame && (isHidingPhase || isNightPhase) && !isMafia && ClientPacketHandler.isPlayerAlive;
+        boolean isMafia = "Mafia".equalsIgnoreCase(ClientPacketHandler.currentRoleName);
+        boolean isDoctor = "Doctor".equalsIgnoreCase(ClientPacketHandler.currentRoleName);
+        boolean isPolice = "Police".equalsIgnoreCase(ClientPacketHandler.currentRoleName);
+
+        boolean shouldCloseEyes = false;
+        String subText = "";
+
+        if (ClientPacketHandler.isInGame && ClientPacketHandler.isPlayerAlive) {
+            if (isHidingPhase) {
+                shouldCloseEyes = !isMafia;
+                subText = "Mafia sedang menyembunyikan Money Pouch...";
+            } else if (isNightMafia) {
+                shouldCloseEyes = !isMafia;
+                subText = "Malam hari... Mafia sedang mencari sasaran!";
+            } else if (isNightDoctor) {
+                shouldCloseEyes = !isDoctor;
+                subText = "Malam hari... Doctor sedang memilih pemain yang dilindungi!";
+            } else if (isNightPolice) {
+                shouldCloseEyes = !isPolice;
+                subText = "Malam hari... Police sedang menyelidiki identitas pemain!";
+            } else if (isNightGeneric) {
+                shouldCloseEyes = !isMafia;
+                subText = "Malam hari... Harap tunggu pergiliran!";
+            }
+        }
 
         long now = System.currentTimeMillis();
         float dt = Math.max(0.001f, Math.min(0.1f, (now - lastAnimTime) / 1000.0f));
@@ -88,9 +114,8 @@ public class DontLieHudOverlay {
                 guiGraphics.drawString(font, title, cx - titleW / 2, cy - 24, 0xFFFFAA00, true);
 
                 // Subtitle
-                String sub = isHidingPhase ? "Mafia sedang menyembunyikan Money Pouch..." : "Malam hari... Mafia sedang mencari sasaran!";
-                int subW = font.width(sub);
-                guiGraphics.drawString(font, sub, cx - subW / 2, cy - 4, 0xFFCCCCCC, true);
+                int subW = font.width(subText);
+                guiGraphics.drawString(font, subText, cx - subW / 2, cy - 4, 0xFFCCCCCC, true);
 
                 // Pulsing Status Text
                 float pulse = (float) (Math.sin(now * 0.005) * 0.5 + 0.5);
@@ -130,15 +155,17 @@ public class DontLieHudOverlay {
         int combinedWidth = font.width(combinedText);
         int phaseCenterX = screenWidth / 2 - combinedWidth / 2;
 
-        // Background panel
-        guiGraphics.fill(phaseCenterX - 6, 4, phaseCenterX + combinedWidth + 6, 20, 0xAA000000);
+        // Background panel with colored top accent line
+        int panelY = 4;
+        guiGraphics.fill(phaseCenterX - 8, panelY, phaseCenterX + combinedWidth + 8, panelY + 16, 0xEE111118);
+        guiGraphics.fill(phaseCenterX - 8, panelY, phaseCenterX + combinedWidth + 8, panelY + 2, 0xFF000000 | ClientPacketHandler.currentPhaseColor);
 
         // Phase name
-        guiGraphics.drawString(font, phaseText, phaseCenterX, 8, 0xFF000000 | ClientPacketHandler.currentPhaseColor, true);
+        guiGraphics.drawString(font, phaseText, phaseCenterX, panelY + 4, 0xFF000000 | ClientPacketHandler.currentPhaseColor, true);
 
         // Separator
         int sepX = phaseCenterX + font.width(phaseText);
-        guiGraphics.drawString(font, " | ", sepX, 8, 0xFF666666, true);
+        guiGraphics.drawString(font, " | ", sepX, panelY + 4, 0xFF888888, true);
 
         // Timer (flash red if <= 10 seconds)
         int timerX = sepX + font.width(" | ");
@@ -151,7 +178,16 @@ public class DontLieHudOverlay {
         } else {
             timerColor = 0xFFFFFFFF;
         }
-        guiGraphics.drawString(font, timerText, timerX, 8, timerColor, true);
+        guiGraphics.drawString(font, timerText, timerX, panelY + 4, timerColor, true);
+
+        // Minigame Banner Overlay (When Minigame Phase is active)
+        if ("Minigame Extra Time".equalsIgnoreCase(ClientPacketHandler.currentPhaseName)) {
+            String miniHint = "🎯 MINIGAME PHASE: Pukul/klik blok/target untuk kumpulkan Poin Extra Time!";
+            int miniW = font.width(miniHint);
+            int miniX = screenWidth / 2 - miniW / 2;
+            guiGraphics.fill(miniX - 6, panelY + 18, miniX + miniW + 6, panelY + 30, 0xDD220033);
+            guiGraphics.drawString(font, miniHint, miniX, panelY + 20, 0xFFFF88FF, true);
+        }
 
         // ==========================================
         // === TOP RIGHT: Alive Count & Status ===

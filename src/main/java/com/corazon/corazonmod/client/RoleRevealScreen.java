@@ -146,7 +146,6 @@ public class RoleRevealScreen extends Screen {
             case "MAFIA" -> "[Sembunyikan uang & eliminasi warga di malam hari]";
             case "DOCTOR" -> "[Pilih 1 pemain untuk diselamatkan setiap malam]";
             case "POLICE" -> "[Periksa identitas 1 pemain setiap malam]";
-            case "BROKER" -> "[Lacak informasi rahasia lokasi uang]";
             default -> "[Cari uang & voting untuk menemukan Mafia!]";
         };
     }

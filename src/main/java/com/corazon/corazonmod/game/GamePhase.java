@@ -5,8 +5,10 @@ import net.minecraft.ChatFormatting;
 public enum GamePhase {
     LOBBY("Lobby", ChatFormatting.GRAY, 0),
     HIDING("Money Hiding Phase", ChatFormatting.RED, 60),
+    MINIGAME("Minigame Extra Time", ChatFormatting.LIGHT_PURPLE, 45),
     SEARCH("Treasure Hunt Phase", ChatFormatting.YELLOW, 300),
-    VOTING("Voting & Discussion", ChatFormatting.AQUA, 120),
+    DISCUSSION("Discussion Phase", ChatFormatting.AQUA, 90),
+    VOTING("Voting Phase", ChatFormatting.GOLD, 30),
     NIGHT("Night Elimination", ChatFormatting.DARK_PURPLE, 45),
     ENDED("Game Ended", ChatFormatting.GOLD, 0);
 

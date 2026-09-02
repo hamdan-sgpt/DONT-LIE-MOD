@@ -3,8 +3,10 @@ package com.corazon.corazonmod.command;
 import com.corazon.corazonmod.config.ArenaConfigManager;
 import com.corazon.corazonmod.game.ArenaBuilder;
 import com.corazon.corazonmod.game.DontLieGame;
+import com.corazon.corazonmod.game.PlayerRole;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -31,8 +33,100 @@ public class DontLieCommands {
                 .then(Commands.literal("start")
                     .requires(source -> source.hasPermission(2))
                     .executes(ctx -> {
-                        List<ServerPlayer> players = new ArrayList<>(ctx.getSource().getServer().getPlayerList().getPlayers());
-                        DontLieGame.getInstance().startNewGame(ctx.getSource().getServer(), players);
+                        DontLieGame.getInstance().startNewGame(ctx.getSource().getServer(), null);
+                        return 1;
+                    })
+                )
+
+                // === REGISTER / JOIN (ADMIN ONLY) ===
+                .then(Commands.literal("register")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        DontLieGame.getInstance().registerPlayer(player);
+                        return 1;
+                    })
+                    .then(Commands.argument("target", EntityArgument.player())
+                        .executes(ctx -> {
+                            ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                            DontLieGame.getInstance().registerPlayer(target);
+                            return 1;
+                        })
+                    )
+                )
+                .then(Commands.literal("join")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        DontLieGame.getInstance().registerPlayer(player);
+                        return 1;
+                    })
+                    .then(Commands.argument("target", EntityArgument.player())
+                        .executes(ctx -> {
+                            ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                            DontLieGame.getInstance().registerPlayer(target);
+                            return 1;
+                        })
+                    )
+                )
+
+                // === UNREGISTER / LEAVE (ADMIN ONLY) ===
+                .then(Commands.literal("unregister")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        DontLieGame.getInstance().unregisterPlayer(player);
+                        return 1;
+                    })
+                    .then(Commands.argument("target", EntityArgument.player())
+                        .executes(ctx -> {
+                            ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                            DontLieGame.getInstance().unregisterPlayer(target);
+                            return 1;
+                        })
+                    )
+                )
+                .then(Commands.literal("leave")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        DontLieGame.getInstance().unregisterPlayer(player);
+                        return 1;
+                    })
+                    .then(Commands.argument("target", EntityArgument.player())
+                        .executes(ctx -> {
+                            ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                            DontLieGame.getInstance().unregisterPlayer(target);
+                            return 1;
+                        })
+                    )
+                )
+
+                // === ROSTER LIST ===
+                .then(Commands.literal("list")
+                    .executes(ctx -> {
+                        var server = ctx.getSource().getServer();
+                        List<ServerPlayer> registered = DontLieGame.getInstance().getRegisteredOnlinePlayers(server);
+                        int totalReg = DontLieGame.getInstance().getRegisteredPlayersCount();
+
+                        ctx.getSource().sendSuccess(() -> Component.literal("════ DAFTAR PESERTA TERDAFTAR (" + totalReg + ") ════").withStyle(net.minecraft.ChatFormatting.GOLD), false);
+                        if (registered.isEmpty()) {
+                            ctx.getSource().sendSuccess(() -> Component.literal("Belum ada pemain yang terdaftar. Ketik /dontlie join untuk mendaftar!").withStyle(net.minecraft.ChatFormatting.GRAY), false);
+                        } else {
+                            for (ServerPlayer p : registered) {
+                                ctx.getSource().sendSuccess(() -> Component.literal(" • " + p.getScoreboardName()).withStyle(net.minecraft.ChatFormatting.GREEN), false);
+                            }
+                        }
+                        ctx.getSource().sendSuccess(() -> Component.literal("════════════════════════════════════════").withStyle(net.minecraft.ChatFormatting.GOLD), false);
+                        return 1;
+                    })
+                )
+
+                // === CLEAR REGISTRATION QUEUE ===
+                .then(Commands.literal("clear")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        DontLieGame.getInstance().clearRegisteredPlayers(ctx.getSource().getServer());
                         return 1;
                     })
                 )
@@ -42,6 +136,24 @@ public class DontLieCommands {
                     .requires(source -> source.hasPermission(2))
                     .executes(ctx -> {
                         DontLieGame.getInstance().stopGame(ctx.getSource().getServer());
+                        return 1;
+                    })
+                )
+
+                // === SKIP DISCUSSION VOTE (ALL PLAYERS) ===
+                .then(Commands.literal("skip")
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        DontLieGame.getInstance().voteSkipDiscussion(player);
+                        return 1;
+                    })
+                )
+
+                // === FORCE SKIP PHASE (ADMIN ONLY) ===
+                .then(Commands.literal("forceskip")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        DontLieGame.getInstance().skipCurrentPhase(ctx.getSource().getServer());
                         return 1;
                     })
                 )
@@ -56,6 +168,66 @@ public class DontLieCommands {
                             ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] ⏱️ Menambah waktu " + sec + " detik!"), true);
                             return 1;
                         })
+                    )
+                )
+
+                // === SET PLAYER ROLE (ADMIN ONLY) ===
+                .then(Commands.literal("setrole")
+                    .requires(source -> source.hasPermission(2))
+                    .then(Commands.argument("target", EntityArgument.player())
+                        .then(Commands.argument("role", StringArgumentType.word())
+                            .executes(ctx -> {
+                                ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                                String roleStr = StringArgumentType.getString(ctx, "role").toUpperCase();
+                                DontLieGame game = DontLieGame.getInstance();
+                                if (roleStr.equals("AUTO") || roleStr.equals("CLEAR") || roleStr.equals("NONE")) {
+                                    game.setPlayerForcedRole(target.getUUID(), null);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🔄 Role manual untuk " + target.getScoreboardName() + " dihapus (Mode Auto)."), true);
+                                } else {
+                                    try {
+                                        PlayerRole role = PlayerRole.valueOf(roleStr);
+                                        game.setPlayerForcedRole(target.getUUID(), role);
+                                        ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🎭 Role manual untuk " + target.getScoreboardName() + " diset ke: " + role.getDisplayName()), true);
+                                    } catch (IllegalArgumentException e) {
+                                        ctx.getSource().sendFailure(Component.literal("[Don't Lie] ❌ Role tidak valid! Pilih: MAFIA, DOCTOR, POLICE, CITIZEN, atau AUTO"));
+                                    }
+                                }
+                                return 1;
+                            })
+                        )
+                    )
+                )
+
+                // === CLEAR ALL FORCED ROLES (ADMIN ONLY) ===
+                .then(Commands.literal("clearroles")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        DontLieGame.getInstance().clearForcedRoles();
+                        ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🧹 Semua settingan role manual telah dibersihkan!"), true);
+                        return 1;
+                    })
+                )
+
+                // === SET ROLE COUNTS (ADMIN ONLY) ===
+                .then(Commands.literal("rolecount")
+                    .requires(source -> source.hasPermission(2))
+                    .then(Commands.argument("mafia", IntegerArgumentType.integer(-1, 50))
+                        .then(Commands.argument("doctor", IntegerArgumentType.integer(-1, 50))
+                            .then(Commands.argument("police", IntegerArgumentType.integer(-1, 50))
+                                .executes(ctx -> {
+                                    int mafia = IntegerArgumentType.getInteger(ctx, "mafia");
+                                    int doctor = IntegerArgumentType.getInteger(ctx, "doctor");
+                                    int police = IntegerArgumentType.getInteger(ctx, "police");
+                                    DontLieGame.getInstance().setCustomRoleCounts(mafia, doctor, police);
+                                    ctx.getSource().sendSuccess(() -> Component.literal(String.format("[Don't Lie] 📊 Jumlah role diperbarui! (Mafia: %s, Doctor: %s, Police: %s)",
+                                        mafia == -1 ? "Auto" : mafia,
+                                        doctor == -1 ? "Auto" : doctor,
+                                        police == -1 ? "Auto" : police
+                                    )), true);
+                                    return 1;
+                                })
+                            )
+                        )
                     )
                 )
 
@@ -146,13 +318,22 @@ public class DontLieCommands {
                 .then(Commands.literal("help")
                     .executes(ctx -> {
                         ctx.getSource().sendSystemMessage(Component.literal("════════ DON'T LIE COMMANDS ════════").withStyle(net.minecraft.ChatFormatting.GOLD));
-                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie start").withStyle(net.minecraft.ChatFormatting.GREEN).append(Component.literal(" - Mulai game baru").withStyle(net.minecraft.ChatFormatting.GRAY)));
-                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie stop").withStyle(net.minecraft.ChatFormatting.RED).append(Component.literal(" - Hentikan game").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie register <player>").withStyle(net.minecraft.ChatFormatting.GREEN).append(Component.literal(" - Daftarkan peserta (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie unregister <player>").withStyle(net.minecraft.ChatFormatting.RED).append(Component.literal(" - Hapus pendaftaran peserta (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie list").withStyle(net.minecraft.ChatFormatting.AQUA).append(Component.literal(" - Lihat daftar pemain terdaftar").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie clear").withStyle(net.minecraft.ChatFormatting.DARK_RED).append(Component.literal(" - Hapus daftar pendaftaran (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie start").withStyle(net.minecraft.ChatFormatting.GREEN).append(Component.literal(" - Mulai game (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie stop").withStyle(net.minecraft.ChatFormatting.RED).append(Component.literal(" - Hentikan game (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie skip").withStyle(net.minecraft.ChatFormatting.YELLOW).append(Component.literal(" - Setuju lewati fase Diskusi (Butuh persetujuan semua pemain)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie forceskip").withStyle(net.minecraft.ChatFormatting.RED).append(Component.literal(" - Paksa lewati fase saat ini (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/dontlie arena").withStyle(net.minecraft.ChatFormatting.AQUA).append(Component.literal(" - Pasang & teleport ke arena world MAP-DONT-LIE").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/dontlie tp").withStyle(net.minecraft.ChatFormatting.LIGHT_PURPLE).append(Component.literal(" - Teleport ke world dontlie_world").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/dontlie spawn").withStyle(net.minecraft.ChatFormatting.YELLOW).append(Component.literal(" - Teleport kembali ke Overworld spawn").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/dontlie setspawn").withStyle(net.minecraft.ChatFormatting.GOLD).append(Component.literal(" - Simpan posisi player saat ini ke config JSON").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/dontlie reloadconfig").withStyle(net.minecraft.ChatFormatting.GOLD).append(Component.literal(" - Reload file config JSON dari disk").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie setrole <player> <role>").withStyle(net.minecraft.ChatFormatting.LIGHT_PURPLE).append(Component.literal(" - Set role manual pemain (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie clearroles").withStyle(net.minecraft.ChatFormatting.DARK_RED).append(Component.literal(" - Hapus semua role manual (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
+                        ctx.getSource().sendSystemMessage(Component.literal("/dontlie rolecount <m> <d> <p>").withStyle(net.minecraft.ChatFormatting.GOLD).append(Component.literal(" - Set jumlah role Mafia/Doctor/Police (Admin)").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/dontlie addtime <detik>").withStyle(net.minecraft.ChatFormatting.YELLOW).append(Component.literal(" - Tambah waktu").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/dontlie vote <player>").withStyle(net.minecraft.ChatFormatting.WHITE).append(Component.literal(" - Vote pemain").withStyle(net.minecraft.ChatFormatting.GRAY)));
                         ctx.getSource().sendSystemMessage(Component.literal("/mafia kill <player>").withStyle(net.minecraft.ChatFormatting.DARK_RED).append(Component.literal(" - Eksekusi malam (Mafia)").withStyle(net.minecraft.ChatFormatting.GRAY)));

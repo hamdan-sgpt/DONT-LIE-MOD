@@ -20,24 +20,33 @@ import java.util.function.Supplier;
 public class OpenAdminMenuPacket {
 
     public static class AdminPlayerEntry {
+        public final UUID uuid;
         public final String name;
         public final String roleDisplayName;
+        public final String forcedRoleName;
         public final boolean isAlive;
+        public final boolean isRegistered;
 
-        public AdminPlayerEntry(String name, String roleDisplayName, boolean isAlive) {
+        public AdminPlayerEntry(UUID uuid, String name, String roleDisplayName, String forcedRoleName, boolean isAlive, boolean isRegistered) {
+            this.uuid = uuid;
             this.name = name;
             this.roleDisplayName = roleDisplayName;
+            this.forcedRoleName = forcedRoleName;
             this.isAlive = isAlive;
+            this.isRegistered = isRegistered;
         }
 
         public void toBytes(FriendlyByteBuf buf) {
+            buf.writeUUID(uuid);
             buf.writeUtf(name);
             buf.writeUtf(roleDisplayName);
+            buf.writeUtf(forcedRoleName);
             buf.writeBoolean(isAlive);
+            buf.writeBoolean(isRegistered);
         }
 
         public static AdminPlayerEntry fromBytes(FriendlyByteBuf buf) {
-            return new AdminPlayerEntry(buf.readUtf(), buf.readUtf(), buf.readBoolean());
+            return new AdminPlayerEntry(buf.readUUID(), buf.readUtf(), buf.readUtf(), buf.readUtf(), buf.readBoolean(), buf.readBoolean());
         }
     }
 
@@ -46,14 +55,24 @@ public class OpenAdminMenuPacket {
     public final int timeRemaining;
     public final int aliveCount;
     public final int totalCount;
+    public final int minigameDuration;
+    public final int mafiaCount;
+    public final int doctorCount;
+    public final int policeCount;
     public final List<AdminPlayerEntry> playerEntries;
 
-    public OpenAdminMenuPacket(boolean isGameRunning, String phaseName, int timeRemaining, int aliveCount, int totalCount, List<AdminPlayerEntry> playerEntries) {
+    public OpenAdminMenuPacket(boolean isGameRunning, String phaseName, int timeRemaining, int aliveCount, int totalCount,
+                                int minigameDuration, int mafiaCount, int doctorCount, int policeCount,
+                                List<AdminPlayerEntry> playerEntries) {
         this.isGameRunning = isGameRunning;
         this.phaseName = phaseName;
         this.timeRemaining = timeRemaining;
         this.aliveCount = aliveCount;
         this.totalCount = totalCount;
+        this.minigameDuration = minigameDuration;
+        this.mafiaCount = mafiaCount;
+        this.doctorCount = doctorCount;
+        this.policeCount = policeCount;
         this.playerEntries = playerEntries;
     }
 
@@ -63,6 +82,10 @@ public class OpenAdminMenuPacket {
         this.timeRemaining = buf.readInt();
         this.aliveCount = buf.readInt();
         this.totalCount = buf.readInt();
+        this.minigameDuration = buf.readInt();
+        this.mafiaCount = buf.readInt();
+        this.doctorCount = buf.readInt();
+        this.policeCount = buf.readInt();
         int size = buf.readInt();
         this.playerEntries = new ArrayList<>();
         for (int i = 0; i < size; i++) {
@@ -76,6 +99,10 @@ public class OpenAdminMenuPacket {
         buf.writeInt(timeRemaining);
         buf.writeInt(aliveCount);
         buf.writeInt(totalCount);
+        buf.writeInt(minigameDuration);
+        buf.writeInt(mafiaCount);
+        buf.writeInt(doctorCount);
+        buf.writeInt(policeCount);
         buf.writeInt(playerEntries.size());
         for (AdminPlayerEntry entry : playerEntries) {
             entry.toBytes(buf);
@@ -98,8 +125,11 @@ public class OpenAdminMenuPacket {
             for (ServerPlayer p : admin.getServer().getPlayerList().getPlayers()) {
                 UUID uuid = p.getUUID();
                 PlayerRole role = game.getRole(uuid);
+                PlayerRole forced = game.getForcedRole(uuid);
+                String forcedName = (forced != null) ? forced.name() : "AUTO";
                 boolean alive = game.isAlive(uuid);
-                entries.add(new AdminPlayerEntry(p.getScoreboardName(), role.getDisplayName(), alive));
+                boolean isReg = game.isRegistered(uuid);
+                entries.add(new AdminPlayerEntry(uuid, p.getScoreboardName(), role.getDisplayName(), forcedName, alive, isReg));
             }
         }
 
@@ -109,6 +139,10 @@ public class OpenAdminMenuPacket {
                 game.getTimeRemaining(),
                 game.getAliveCount(),
                 game.getTotalPlayers(),
+                game.getCustomMinigameDuration(),
+                game.getCustomMafiaCount(),
+                game.getCustomDoctorCount(),
+                game.getCustomPoliceCount(),
                 entries
         );
 
