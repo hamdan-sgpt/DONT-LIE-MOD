@@ -1,35 +1,5 @@
 @echo off
-title Minecraft Client 3 - Player3
-echo ==========================================
-echo   MINECRAFT CLIENT 3 - Player3
-echo ==========================================
-echo.
-
-if not exist "gradle\wrapper\gradle-wrapper.jar" (
-    echo [INFO] gradle-wrapper.jar belum ada. Mengunduh otomatis...
-    if not exist "gradle\wrapper" mkdir "gradle\wrapper"
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/gradle/gradle/v8.5/gradle/wrapper/gradle-wrapper.jar' -OutFile 'gradle\wrapper\gradle-wrapper.jar'"
-)
-
-if not exist "src\main\resources\maps\MAP-DONT-LIE" (
-    echo [INFO] Memasang World Map ke src/main/resources/maps/MAP-DONT-LIE...
-    xcopy /E /I /Y /Q "MAP-DONT-LIE" "src\main\resources\maps\MAP-DONT-LIE" >nul
-)
-if not exist "run-client3\saves\MAP-DONT-LIE" (
-    echo [INFO] Memasang World Map 'MAP-DONT-LIE' ke run-client3/saves...
-    xcopy /E /I /Y /Q "MAP-DONT-LIE" "run-client3\saves\MAP-DONT-LIE" >nul
-)
-if not exist "run-client3\MAP-DONT-LIE" (
-    echo [INFO] Memasang World Map source ke run-client3/MAP-DONT-LIE...
-    xcopy /E /I /Y /Q "MAP-DONT-LIE" "run-client3\MAP-DONT-LIE" >nul
-)
-
-if exist "fix_textures.py" (
-    echo [INFO] Menjaga tekstur Money Pouch ^& Items tetap up-to-date...
-    python fix_textures.py >nul 2>&1
-)
-
-echo Menjalankan Minecraft sebagai "Player3"...
-echo.
-call gradlew.bat runClient3 --args="--username Player3"
+title Client 3 - Mingyu
+echo Launching Minecraft Client 3 (Mingyu)...
+gradlew.bat runClient3 --args="--username Mingyu"
 pause

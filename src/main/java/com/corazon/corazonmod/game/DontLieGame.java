@@ -536,12 +536,24 @@ public class DontLieGame {
                 }
             }
         } else if (phase == GamePhase.SEARCH) {
-            // Unfreeze all players so they can search freely
+            // Teleport ALL alive players to the Discussion Seats / Starting Point, and unfreeze them so everyone starts searching from the same spot!
+            List<com.corazon.corazonmod.config.ArenaConfigManager.PosData> seats = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getDiscussionSeats();
+            ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
+
+            int seatIndex = 0;
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
                     p.removeEffect(MobEffects.BLINDNESS);
                     p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
                     p.removeEffect(MobEffects.MOVEMENT_SPEED);
+                    p.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+
+                    if (dontLieLevel != null && !seats.isEmpty()) {
+                        com.corazon.corazonmod.config.ArenaConfigManager.PosData seat = seats.get(seatIndex % seats.size());
+                        p.teleportTo(dontLieLevel, seat.x, seat.y, seat.z, seat.yaw, seat.pitch);
+                        p.connection.teleport(seat.x, seat.y, seat.z, seat.yaw, seat.pitch);
+                        seatIndex++;
+                    }
                 }
             }
         } else {
@@ -555,8 +567,8 @@ public class DontLieGame {
     }
 
     public static class PlayerPos {
-        public final double x, y, z;
-        public final float yaw, pitch;
+        public double x, y, z;
+        public float yaw, pitch;
         public PlayerPos(double x, double y, double z, float yaw, float pitch) {
             this.x = x; this.y = y; this.z = z; this.yaw = yaw; this.pitch = pitch;
         }
@@ -564,12 +576,26 @@ public class DontLieGame {
 
     private final Map<UUID, PlayerPos> hidingStartPositions = new HashMap<>();
 
-    public void returnMafiaToStartPos(ServerPlayer mafia) {
-        if (mafia == null) return;
-        PlayerPos startPos = hidingStartPositions.get(mafia.getUUID());
+    public void returnPlayerToStartPos(ServerPlayer player) {
+        if (player == null) return;
+        player.removeEffect(MobEffects.MOVEMENT_SPEED);
+        player.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+
+        PlayerPos startPos = hidingStartPositions.get(player.getUUID());
         if (startPos != null) {
-            mafia.teleportTo((ServerLevel) mafia.level(), startPos.x, startPos.y, startPos.z, startPos.yaw, startPos.pitch);
-            mafia.sendSystemMessage(Component.literal("↩️ Kamu telah dikembalikan ke posisi awal agar tidak dicurigai pemain lain!").withStyle(ChatFormatting.GREEN));
+            ServerLevel level = (ServerLevel) player.level();
+            player.teleportTo(level, startPos.x, startPos.y, startPos.z, startPos.yaw, startPos.pitch);
+            player.connection.teleport(startPos.x, startPos.y, startPos.z, startPos.yaw, startPos.pitch);
+            player.sendSystemMessage(Component.literal("↩️ Kamu telah dikembalikan ke posisi awal agar tidak dicurigai pemain lain!").withStyle(ChatFormatting.GREEN));
+        } else {
+            // Fallback to arena spawn position if startPos was not recorded
+            com.corazon.corazonmod.config.ArenaConfigManager.PosData spawn = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getMainSpawn();
+            ServerLevel dontLieLevel = player.getServer() != null ? player.getServer().getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY) : null;
+            ServerLevel targetLevel = dontLieLevel != null ? dontLieLevel : (ServerLevel) player.level();
+
+            player.teleportTo(targetLevel, spawn.x, spawn.y, spawn.z, spawn.yaw, spawn.pitch);
+            player.connection.teleport(spawn.x, spawn.y, spawn.z, spawn.yaw, spawn.pitch);
+            player.sendSystemMessage(Component.literal("↩️ Kamu telah dikembalikan ke posisi spawn arena agar tidak dicurigai!").withStyle(ChatFormatting.GREEN));
         }
     }
 
@@ -581,6 +607,21 @@ public class DontLieGame {
 
     public void advanceNightTurn(MinecraftServer server) {
         if (currentPhase != GamePhase.NIGHT) return;
+
+        // Return current active role player back to starting position immediately after making choice
+        PlayerRole activeRole = switch (nightSubPhase) {
+            case 0 -> PlayerRole.MAFIA;
+            case 1 -> PlayerRole.DOCTOR;
+            case 2 -> PlayerRole.POLICE;
+            default -> PlayerRole.MAFIA;
+        };
+
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (isParticipant(p.getUUID()) && isAlive(p.getUUID()) && getRole(p.getUUID()) == activeRole) {
+                returnPlayerToStartPos(p);
+            }
+        }
+
         if (nightSubPhase < 2) {
             nightSubPhase++;
             startNightSubPhase(server);
@@ -626,21 +667,20 @@ public class DontLieGame {
 
                 if (isAlive(p.getUUID())) {
                     if (role == activeRole) {
-                        // Eyes open for active turn role
+                        // Eyes open & FREE MOVEMENT for active turn role
                         p.removeEffect(MobEffects.BLINDNESS);
                         p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
-                        p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 15 * 20, 255, false, false));
 
                         if (role == PlayerRole.MAFIA) {
                             p.getInventory().add(new ItemStack(ModItems.MAFIA_DAGGER.get()));
-                            p.sendSystemMessage(Component.literal("🔪 [MALAM HARI] Dagger Mafia diberikan! Pukul/klik pemain lain di dunia untuk mengeksekusi!").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD));
+                            p.sendSystemMessage(Component.literal("🔪 [MALAM HARI] Dagger Mafia diberikan! Jalan & pukul/klik pemain yang ingin kamu eksekusi!").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD));
                         } else if (role == PlayerRole.DOCTOR) {
-                            p.sendSystemMessage(Component.literal("🛡️ [MALAM HARI] Giliran Doctor! Pukul/klik pemain lain (atau klik kanan untuk diri sendiri) untuk melindungi!").withStyle(ChatFormatting.BLUE, ChatFormatting.BOLD));
+                            p.sendSystemMessage(Component.literal("🛡️ [MALAM HARI] Giliran Doctor! Jalan & pukul/klik pemain (atau klik kanan untuk diri sendiri) untuk melindungi!").withStyle(ChatFormatting.BLUE, ChatFormatting.BOLD));
                         } else if (role == PlayerRole.POLICE) {
-                            p.sendSystemMessage(Component.literal("🔍 [MALAM HARI] Giliran Police! Pukul/klik pemain lain untuk menyelidiki identitasnya!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+                            p.sendSystemMessage(Component.literal("🔍 [MALAM HARI] Giliran Police! Jalan & pukul/klik pemain untuk menyelidiki identitasnya!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
                         }
                     } else {
-                        // Eyes closed for non-active roles
+                        // Eyes closed & frozen for non-active roles
                         p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 15 * 20, 1, false, false));
                         p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 15 * 20, 255, false, false));
                     }
