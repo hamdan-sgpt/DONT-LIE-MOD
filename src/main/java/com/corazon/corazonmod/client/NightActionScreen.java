@@ -91,6 +91,11 @@ public class NightActionScreen extends Screen {
     public void tick() {
         super.tick();
         ticksOpen++;
+
+        // Auto-close Night Screen if phase has changed or night phase ended
+        if (!"Night Elimination".equalsIgnoreCase(ClientPacketHandler.currentPhaseName)) {
+            this.onClose();
+        }
     }
 
     @Override

@@ -55,6 +55,17 @@ public class ClientPacketHandler {
         isPlayerAlive = isAlive;
         isInGame = true;
 
+        // Auto-close open GUI screens if phase changes or game ends
+        Minecraft.getInstance().execute(() -> {
+            net.minecraft.client.gui.screens.Screen currentScreen = Minecraft.getInstance().screen;
+            if (currentScreen instanceof VotingScreen && !"Voting Phase".equalsIgnoreCase(phaseName)) {
+                Minecraft.getInstance().setScreen(null);
+            }
+            if (currentScreen instanceof NightActionScreen && !"Night Elimination".equalsIgnoreCase(phaseName)) {
+                Minecraft.getInstance().setScreen(null);
+            }
+        });
+
         // Reset when game ends
         if ("Game Ended".equals(phaseName) || "Lobby".equals(phaseName)) {
             isInGame = false;

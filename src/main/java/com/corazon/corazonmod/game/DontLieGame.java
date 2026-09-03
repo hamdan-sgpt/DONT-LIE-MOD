@@ -921,6 +921,7 @@ public class DontLieGame {
             ServerPlayer eliminated = server.getPlayerList().getPlayer(highestVoted);
             if (eliminated != null) {
                 alivePlayers.remove(highestVoted);
+                dropPouchIfCarried(eliminated);
                 eliminated.setGameMode(GameType.SPECTATOR);
                 PlayerRole role = getRole(highestVoted);
 
@@ -1021,6 +1022,7 @@ public class DontLieGame {
                 ServerPlayer victim = server.getPlayerList().getPlayer(mafiaTarget);
                 if (victim != null) {
                     alivePlayers.remove(mafiaTarget);
+                    dropPouchIfCarried(victim);
                     victim.setGameMode(GameType.SPECTATOR);
 
                     // Dramatic death announcement with title
@@ -1040,6 +1042,31 @@ public class DontLieGame {
             }
         } else {
             broadcastToAll(server, Component.literal("🌅 Pagi hari tiba dengan tenang. Tidak ada korban jiwa semalam.").withStyle(ChatFormatting.GRAY));
+        }
+    }
+
+    public void dropPouchIfCarried(ServerPlayer player) {
+        if (player == null) return;
+        boolean hadPouch = false;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (!stack.isEmpty() && stack.is(ModItems.MONEY_POUCH.get())) {
+                hadPouch = true;
+                player.getInventory().removeItem(stack);
+            }
+        }
+
+        if (hadPouch) {
+            // Drop Money Pouch item at player's location
+            ItemStack pouchStack = new ItemStack(ModItems.MONEY_POUCH.get());
+            player.drop(pouchStack, true, false);
+
+            if (player.getServer() != null) {
+                broadcastToAll(
+                    player.getServer(),
+                    Component.literal("💰 MONEY POUCH TERJATUH! " + player.getScoreboardName() + " gugur dan menjatuhkan Pouch! Cari kembali di fase pencarian!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
+                );
+            }
         }
     }
 
