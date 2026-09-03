@@ -115,7 +115,7 @@ public class ChestInteractionHandler {
     private static void triggerHidingComplete(DontLieGame game, ServerPlayer player) {
         if (player.getServer() != null) {
             // Return Mafia back to initial spawn position so nobody suspects Mafia!
-            game.returnMafiaToStartPos(player);
+            game.returnPlayerToStartPos(player);
 
             game.broadcastToAll(
                 player.getServer(),

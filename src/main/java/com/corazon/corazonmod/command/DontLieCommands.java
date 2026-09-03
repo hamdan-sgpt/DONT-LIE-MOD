@@ -208,6 +208,41 @@ public class DontLieCommands {
                     })
                 )
 
+                // === TELEPORT TO MONEY POUCH (ADMIN DEBUG) ===
+                .then(Commands.literal("tppouch")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer admin = ctx.getSource().getPlayerOrException();
+                        ServerLevel level = admin.serverLevel();
+
+                        // 1. Check if any online player is holding Money Pouch in inventory
+                        for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
+                            for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
+                                net.minecraft.world.item.ItemStack stack = p.getInventory().getItem(i);
+                                if (!stack.isEmpty() && stack.is(com.corazon.corazonmod.init.ModItems.MONEY_POUCH.get())) {
+                                    admin.teleportTo((ServerLevel) p.level(), p.getX(), p.getY(), p.getZ(), p.getYRot(), p.getXRot());
+                                    admin.connection.teleport(p.getX(), p.getY(), p.getZ(), p.getYRot(), p.getXRot());
+                                    ctx.getSource().sendSuccess(() -> Component.literal("💰 [ADMIN] Teleport ke " + p.getScoreboardName() + " (Pemegang Money Pouch saat ini)!"), true);
+                                    return 1;
+                                }
+                            }
+                        }
+
+                        // 2. Check for physical MoneyPouchEntity in the world
+                        for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+                            if (entity instanceof com.corazon.corazonmod.entity.MoneyPouchEntity pouchEntity) {
+                                admin.teleportTo((ServerLevel) pouchEntity.level(), pouchEntity.getX(), pouchEntity.getY(), pouchEntity.getZ(), pouchEntity.getYRot(), pouchEntity.getXRot());
+                                admin.connection.teleport(pouchEntity.getX(), pouchEntity.getY(), pouchEntity.getZ(), pouchEntity.getYRot(), pouchEntity.getXRot());
+                                ctx.getSource().sendSuccess(() -> Component.literal("💰 [ADMIN] Teleport ke lokasi Fisik 3D Money Pouch di arena! (X: " + (int)pouchEntity.getX() + ", Y: " + (int)pouchEntity.getY() + ", Z: " + (int)pouchEntity.getZ() + ")"), true);
+                                return 1;
+                            }
+                        }
+
+                        ctx.getSource().sendFailure(Component.literal("ℹ️ [ADMIN] Money Pouch belum disembunyikan atau tidak ditemukan di dunia."));
+                        return 0;
+                    })
+                )
+
                 // === SET ROLE COUNTS (ADMIN ONLY) ===
                 .then(Commands.literal("rolecount")
                     .requires(source -> source.hasPermission(2))

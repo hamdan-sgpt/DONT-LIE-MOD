@@ -1057,14 +1057,40 @@ public class DontLieGame {
         }
 
         if (hadPouch) {
-            // Drop Money Pouch item at player's location
-            ItemStack pouchStack = new ItemStack(ModItems.MONEY_POUCH.get());
-            player.drop(pouchStack, true, false);
+            MinecraftServer server = player.getServer();
+            if (server != null) {
+                List<com.corazon.corazonmod.config.ArenaConfigManager.TaskPosData> taskLocs = 
+                    com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getData().taskLocations;
+                List<com.corazon.corazonmod.config.ArenaConfigManager.PosData> seatLocs = 
+                    com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getDiscussionSeats();
+                
+                ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
+                ServerLevel level = dontLieLevel != null ? dontLieLevel : (ServerLevel) player.level();
 
-            if (player.getServer() != null) {
+                // Collect valid, walkable arena coordinates
+                List<net.minecraft.world.phys.Vec3> validPositions = new ArrayList<>();
+                if (taskLocs != null && !taskLocs.isEmpty()) {
+                    for (var t : taskLocs) validPositions.add(new net.minecraft.world.phys.Vec3(t.x, t.y, t.z));
+                }
+                if (seatLocs != null && !seatLocs.isEmpty()) {
+                    for (var s : seatLocs) validPositions.add(new net.minecraft.world.phys.Vec3(s.x, s.y, s.z));
+                }
+
+                net.minecraft.world.phys.Vec3 targetPos = new net.minecraft.world.phys.Vec3(player.getX(), player.getY(), player.getZ());
+                if (!validPositions.isEmpty()) {
+                    targetPos = validPositions.get(new Random().nextInt(validPositions.size()));
+                }
+
+                // Spawn physical 3D MoneyPouchEntity cleanly on the floor level
+                com.corazon.corazonmod.entity.MoneyPouchEntity pouchEntity = new com.corazon.corazonmod.entity.MoneyPouchEntity(
+                    com.corazon.corazonmod.init.ModEntities.MONEY_POUCH.get(), level
+                );
+                pouchEntity.moveTo(targetPos.x, targetPos.y + 0.1, targetPos.z, 0.0F, 0.0F);
+                level.addFreshEntity(pouchEntity);
+
                 broadcastToAll(
-                    player.getServer(),
-                    Component.literal("💰 MONEY POUCH TERJATUH! " + player.getScoreboardName() + " gugur dan menjatuhkan Pouch! Cari kembali di fase pencarian!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
+                    server,
+                    Component.literal("💰 MONEY POUCH TERSEMBUNYI KEMBALI! " + player.getScoreboardName() + " gugur dan Pouch terselip di salah satu ruangan arena! Cari kembali saat Search Phase!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
                 );
             }
         }
