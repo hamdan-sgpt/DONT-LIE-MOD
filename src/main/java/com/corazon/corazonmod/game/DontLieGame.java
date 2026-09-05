@@ -791,7 +791,31 @@ public class DontLieGame {
 
         tickCounter++;
 
-        // Parkour Finish Proximity Detection during MINIGAME Phase
+        // Parkour Fall Y-Level Detection during MINIGAME Phase
+        if (currentPhase == GamePhase.MINIGAME && !isParkourFinished) {
+            var start = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourStart();
+            double dropLimitY = start.y - 7.0;
+
+            for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                    if (parkourGroupMode || (parkourRunnerUUID != null && p.getUUID().equals(parkourRunnerUUID))) {
+                        if (p.getY() < dropLimitY) {
+                            p.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+                            p.fallDistance = 0.0f;
+                            p.setHealth(p.getMaxHealth());
+
+                            ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
+                            ServerLevel level = dontLieLevel != null ? dontLieLevel : (ServerLevel) p.level();
+                            p.teleportTo(level, start.x, start.y, start.z, start.yaw, start.pitch);
+                            p.connection.teleport(start.x, start.y, start.z, start.yaw, start.pitch);
+
+                            p.sendSystemMessage(Component.literal("⚠️ Kamu jatuh dari Parkour! Reset ke Garis Start.").withStyle(ChatFormatting.YELLOW));
+                            p.level().playSound(null, p.blockPosition(), SoundEvents.PLAYER_HURT, SoundSource.MASTER, 0.6f, 1.2f);
+                        }
+                    }
+                }
+            }
+        }
         if (currentPhase == GamePhase.MINIGAME && !isParkourFinished) {
             var finish = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourFinish();
             if (parkourGroupMode) {
