@@ -127,15 +127,18 @@ public class ChestInteractionHandler {
             );
             game.broadcastToAll(
                 player.getServer(),
-                Component.literal("  Hiding Phase diselesaikan lebih cepat. Parkour Minigame dimulai!  ").withStyle(ChatFormatting.GREEN)
+                Component.literal("  Hiding Phase diselesaikan lebih cepat.  ").withStyle(ChatFormatting.GREEN)
             );
             game.broadcastToAll(
                 player.getServer(),
                 Component.literal("========================================").withStyle(ChatFormatting.GOLD)
             );
 
-            // Transition to MINIGAME phase (Parkour)
-            game.setPhase(player.getServer(), GamePhase.MINIGAME);
+            if (game.isParkourEnabled()) {
+                game.startParkourModeVoting(player.getServer());
+            } else {
+                game.setPhase(player.getServer(), GamePhase.SEARCH);
+            }
         }
     }
 }

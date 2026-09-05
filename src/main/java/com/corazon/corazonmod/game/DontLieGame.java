@@ -1269,7 +1269,7 @@ public class DontLieGame {
                     nightSubPhase = 0;
                     resolveNightActions(server);
                     if (checkWinConditions(server)) return;
-                    setPhase(server, GamePhase.MINIGAME);
+                    setPhase(server, GamePhase.SEARCH);
                 }
             }
         }
