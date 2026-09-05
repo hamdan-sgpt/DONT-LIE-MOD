@@ -361,6 +361,31 @@ public class DontLieCommands {
                     })
                 )
 
+                // === SET PARKOUR MODE (PERWAKILAN / BARENG) ===
+                .then(Commands.literal("setparkourmode")
+                    .requires(source -> source.hasPermission(2))
+                    .then(Commands.literal("perwakilan")
+                        .executes(ctx -> {
+                            DontLieGame.getInstance().setParkourGroupMode(false);
+                            ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🏃 Mode Parkour Minigame diubah ke: PERWAKILAN (1 PEMAIN)"), true);
+                            return 1;
+                        })
+                    )
+                    .then(Commands.literal("bareng")
+                        .executes(ctx -> {
+                            DontLieGame.getInstance().setParkourGroupMode(true);
+                            ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🏃 Mode Parkour Minigame diubah ke: BARENG-BARENG (SEMUA PEMAIN)"), true);
+                            return 1;
+                        })
+                    )
+                    .executes(ctx -> {
+                        DontLieGame.getInstance().toggleParkourGroupMode();
+                        String modeName = DontLieGame.getInstance().isParkourGroupMode() ? "BARENG-BARENG (SEMUA PEMAIN)" : "PERWAKILAN (1 PEMAIN)";
+                        ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🏃 Mode Parkour Minigame diubah ke: " + modeName), true);
+                        return 1;
+                    })
+                )
+
                 // === SET PARKOUR FINISH COORDS ===
                 .then(Commands.literal("setparkourfinish")
                     .requires(source -> source.hasPermission(2))

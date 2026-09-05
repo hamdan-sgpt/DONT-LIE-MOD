@@ -46,6 +46,7 @@ public class OpenNightActionPacket {
         ctx.enqueueWork(() -> {
             ClientPacketHandler.handleOpenNightAction(actionType, targetPlayers);
         });
+        ctx.setPacketHandled(true);
         return true;
     }
 

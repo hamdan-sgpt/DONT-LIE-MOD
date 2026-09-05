@@ -157,6 +157,38 @@ public class AdminActionPacket {
                     game.clearForcedRoles();
                     OpenAdminMenuPacket.sendToAdmin(player);
                 }
+                case "TOGGLE_REGISTER" -> {
+                    try {
+                        UUID targetUUID = UUID.fromString(targetUUIDStr);
+                        ServerPlayer target = player.getServer().getPlayerList().getPlayer(targetUUID);
+                        if (target != null) {
+                            if (game.isRegistered(targetUUID)) {
+                                game.unregisterPlayer(target);
+                            } else {
+                                game.registerPlayer(target);
+                            }
+                        }
+                        OpenAdminMenuPacket.sendToAdmin(player);
+                    } catch (Exception ignored) {}
+                }
+                case "REGISTER_ALL" -> {
+                    int added = 0;
+                    for (ServerPlayer p : player.getServer().getPlayerList().getPlayers()) {
+                        if (game.registerPlayer(p)) added++;
+                    }
+                    player.sendSystemMessage(Component.literal("[Don't Lie] ✅ Berhasil mendaftarkan " + added + " pemain online!").withStyle(net.minecraft.ChatFormatting.GREEN));
+                    OpenAdminMenuPacket.sendToAdmin(player);
+                }
+                case "UNREGISTER_ALL" -> {
+                    game.clearRegisteredPlayers(player.getServer());
+                    OpenAdminMenuPacket.sendToAdmin(player);
+                }
+                case "TOGGLE_PARKOUR_MODE" -> {
+                    game.toggleParkourGroupMode();
+                    String modeName = game.isParkourGroupMode() ? "BARENG-BARENG (SEMUA PEMAIN)" : "PERWAKILAN (1 PEMAIN)";
+                    player.sendSystemMessage(Component.literal("[Don't Lie] 🏃 Mode Parkour Minigame diubah ke: " + modeName).withStyle(net.minecraft.ChatFormatting.GOLD));
+                    OpenAdminMenuPacket.sendToAdmin(player);
+                }
                 case "REQUEST_OPEN_MENU" -> {
                     OpenAdminMenuPacket.sendToAdmin(player);
                 }

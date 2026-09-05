@@ -67,6 +67,8 @@ public class ArenaConfigManager {
         public PosData mafiaSpawn = new PosData(-56.065, 31.000, 132.809, 0.0f, 0.0f);
         public PosData doctorSpawn = new PosData(-56.065, 31.000, 132.809, 0.0f, 0.0f);
         public PosData policeSpawn = new PosData(-56.065, 31.000, 132.809, 0.0f, 0.0f);
+        public PosData parkourStart = new PosData(-113.671, -5.000, 40.424, 91.8f, -0.3f);
+        public PosData parkourFinish = new PosData(-138.434, 26.000, 61.381, 175.4f, 16.7f);
         public List<PosData> discussionSeats = new ArrayList<>();
         public List<TaskPosData> taskLocations = new ArrayList<>();
 
@@ -163,5 +165,23 @@ public class ArenaConfigManager {
             return fallback;
         }
         return getData().discussionSeats;
+    }
+
+    public void setParkourStart(double x, double y, double z, float yaw, float pitch) {
+        getData().parkourStart = new PosData(x, y, z, yaw, pitch);
+        save();
+    }
+
+    public void setParkourFinish(double x, double y, double z) {
+        getData().parkourFinish = new PosData(x, y, z, 0.0f, 0.0f);
+        save();
+    }
+
+    public PosData getParkourStart() {
+        return getData().parkourStart != null ? getData().parkourStart : getMainSpawn();
+    }
+
+    public PosData getParkourFinish() {
+        return getData().parkourFinish != null ? getData().parkourFinish : getMainSpawn();
     }
 }

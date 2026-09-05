@@ -96,8 +96,8 @@ public class VotingScreen extends Screen {
         super.tick();
         ticksOpen++;
 
-        // Auto-close Voting Screen if phase has changed or voting time ended
-        if (!"Voting Phase".equalsIgnoreCase(ClientPacketHandler.currentPhaseName)) {
+        // Auto-close Voting Screen if phase has changed after screen was opened
+        if (ticksOpen > 10 && !"Voting Phase".equalsIgnoreCase(ClientPacketHandler.currentPhaseName)) {
             this.onClose();
         }
     }

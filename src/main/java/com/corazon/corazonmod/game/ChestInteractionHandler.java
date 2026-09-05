@@ -127,15 +127,15 @@ public class ChestInteractionHandler {
             );
             game.broadcastToAll(
                 player.getServer(),
-                Component.literal("  Hiding Phase diselesaikan lebih cepat. Treasure Hunt dimulai!  ").withStyle(ChatFormatting.GREEN)
+                Component.literal("  Hiding Phase diselesaikan lebih cepat. Parkour Minigame dimulai!  ").withStyle(ChatFormatting.GREEN)
             );
             game.broadcastToAll(
                 player.getServer(),
                 Component.literal("========================================").withStyle(ChatFormatting.GOLD)
             );
 
-            // Skip straight to SEARCH phase!
-            game.setPhase(player.getServer(), GamePhase.SEARCH);
+            // Transition to MINIGAME phase (Parkour)
+            game.setPhase(player.getServer(), GamePhase.MINIGAME);
         }
     }
 }

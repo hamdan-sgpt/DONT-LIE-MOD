@@ -33,12 +33,14 @@ public class ClientPacketHandler {
 
     public static void handleOpenVoting(List<OpenVotingScreenPacket.PlayerEntry> alivePlayers) {
         Minecraft.getInstance().execute(() -> {
+            currentPhaseName = "Voting Phase";
             Minecraft.getInstance().setScreen(new VotingScreen(alivePlayers));
         });
     }
 
     public static void handleOpenNightAction(String actionType, List<OpenVotingScreenPacket.PlayerEntry> targetPlayers) {
         Minecraft.getInstance().execute(() -> {
+            currentPhaseName = "Night Elimination";
             Minecraft.getInstance().setScreen(new NightActionScreen(actionType, targetPlayers));
         });
     }

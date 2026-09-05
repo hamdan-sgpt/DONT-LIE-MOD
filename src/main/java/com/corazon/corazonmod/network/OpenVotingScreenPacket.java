@@ -52,6 +52,7 @@ public class OpenVotingScreenPacket {
         ctx.enqueueWork(() -> {
             ClientPacketHandler.handleOpenVoting(alivePlayers);
         });
+        ctx.setPacketHandled(true);
         return true;
     }
 

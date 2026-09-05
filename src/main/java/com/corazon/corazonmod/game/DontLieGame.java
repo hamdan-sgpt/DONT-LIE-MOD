@@ -43,7 +43,7 @@ public class DontLieGame {
     private int hudSyncCounter = 0;
 
     private int customHidingDuration = 60;
-    private int customMinigameDuration = 45;
+    private int customMinigameDuration = 120;
     private int customSearchDuration = 300;
     private int customDiscussionDuration = 90;
     private int customVotingDuration = 30;
@@ -59,9 +59,32 @@ public class DontLieGame {
     private UUID moneyHolder = null;
     private UUID mafiaTarget = null;
     private UUID doctorTarget = null;
+    private UUID parkourRunnerUUID = null;
+    private boolean isParkourFinished = false;
+    private boolean parkourGroupMode = false; // false = Perwakilan (1 Runner), true = Bareng-bareng (Semua Pemain)
+
+    public boolean isParkourGroupMode() {
+        return parkourGroupMode;
+    }
+
+    public void setParkourGroupMode(boolean groupMode) {
+        this.parkourGroupMode = groupMode;
+    }
+
+    public void toggleParkourGroupMode() {
+        this.parkourGroupMode = !this.parkourGroupMode;
+    }
+
+    public void setParkourRunner(UUID playerUUID) {
+        this.parkourRunnerUUID = playerUUID;
+    }
+
+    public UUID getParkourRunner() {
+        return parkourRunnerUUID;
+    }
 
     public void setCustomDurations(int hidingSeconds, int searchSeconds, int discussionSeconds, int votingSeconds) {
-        setCustomDurations(hidingSeconds, 45, searchSeconds, discussionSeconds, votingSeconds);
+        setCustomDurations(hidingSeconds, 120, searchSeconds, discussionSeconds, votingSeconds);
     }
 
     public void setCustomDurations(int hidingSeconds, int minigameSeconds, int searchSeconds, int discussionSeconds, int votingSeconds) {
@@ -234,8 +257,8 @@ public class DontLieGame {
                 players = getRegisteredOnlinePlayers(server);
                 broadcastToAll(server, Component.literal("[Don't Lie] 📝 Memulai game dengan " + players.size() + " pemain terdaftar!").withStyle(ChatFormatting.GOLD));
             } else {
-                players = new ArrayList<>(server.getPlayerList().getPlayers());
-                broadcastToAll(server, Component.literal("[Don't Lie] ⚠️ Tidak ada pendaftaran khusus. Memulai game dengan SEMUA pemain online (" + players.size() + " pemain).").withStyle(ChatFormatting.YELLOW));
+                broadcastToAll(server, Component.literal("[Don't Lie] ❌ Tidak ada pemain yang terdaftar! Pemain harus mendaftar dulu (/dontlie join) atau Admin menaftarkan semua pemain (/dontlie registerall).").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+                return;
             }
         }
 
@@ -478,12 +501,83 @@ public class DontLieGame {
         // Handle Phase-specific behaviors & effects
         if (phase == GamePhase.MINIGAME) {
             this.minigameScore = 0;
-            for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-                if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
-                    p.removeEffect(MobEffects.BLINDNESS);
-                    p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
-                    p.removeEffect(MobEffects.MOVEMENT_SPEED);
+            this.isParkourFinished = false;
+
+            var parkourStart = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourStart();
+            ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
+
+            if (parkourGroupMode) {
+                // Mode Bareng-bareng (Semua Pemain Bertanding)
+                for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                    if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                        p.removeEffect(MobEffects.BLINDNESS);
+                        p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                        p.removeEffect(MobEffects.MOVEMENT_SPEED);
+
+                        ServerLevel level = dontLieLevel != null ? dontLieLevel : (ServerLevel) p.level();
+                        p.teleportTo(level, parkourStart.x, parkourStart.y, parkourStart.z, parkourStart.yaw, parkourStart.pitch);
+                        p.connection.teleport(parkourStart.x, parkourStart.y, parkourStart.z, parkourStart.yaw, parkourStart.pitch);
+
+                        p.connection.send(new ClientboundSetTitlesAnimationPacket(10, 60, 10));
+                        p.connection.send(new ClientboundSetTitleTextPacket(
+                            Component.literal("🏃 PARKOUR BARENG-BARENG!").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD)));
+                        p.connection.send(new ClientboundSetSubtitleTextPacket(
+                            Component.literal("Lari ke Garis Finish Parkour secepatnya! Siapa saja yang finish berikan bonus waktu!").withStyle(ChatFormatting.YELLOW)));
+                    }
                 }
+
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
+                broadcastToAll(server, Component.literal("🎯 FASE PARKOUR MINIGAME (BARENG-BARENG - 2 MENIT) DIMULAI!").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
+                broadcastToAll(server, Component.literal("🏃 Semua pemain berlari bersama di Arena Parkour!").withStyle(ChatFormatting.YELLOW));
+                broadcastToAll(server, Component.literal("🎁 Capai garis Finish dalam 2 menit = BONUS +3 MENIT Waktu Pencarian Uang!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
+            } else {
+                // Mode Perwakilan (1 Runner Utama)
+                if (parkourRunnerUUID == null || !isAlive(parkourRunnerUUID) || server.getPlayerList().getPlayer(parkourRunnerUUID) == null) {
+                    for (UUID uuid : alivePlayers) {
+                        if (server.getPlayerList().getPlayer(uuid) != null) {
+                            this.parkourRunnerUUID = uuid;
+                            break;
+                        }
+                    }
+                }
+
+                ServerPlayer runner = (parkourRunnerUUID != null) ? server.getPlayerList().getPlayer(parkourRunnerUUID) : null;
+                String runnerName = runner != null ? runner.getScoreboardName() : "Perwakilan Pemain";
+
+                if (runner != null) {
+                    ServerLevel level = dontLieLevel != null ? dontLieLevel : (ServerLevel) runner.level();
+                    runner.teleportTo(level, parkourStart.x, parkourStart.y, parkourStart.z, parkourStart.yaw, parkourStart.pitch);
+                    runner.connection.teleport(parkourStart.x, parkourStart.y, parkourStart.z, parkourStart.yaw, parkourStart.pitch);
+                }
+
+                for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                    if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                        p.removeEffect(MobEffects.BLINDNESS);
+                        p.removeEffect(MobEffects.MOVEMENT_SLOWDOWN);
+                        p.removeEffect(MobEffects.MOVEMENT_SPEED);
+
+                        if (runner != null && p.getUUID().equals(runner.getUUID())) {
+                            p.connection.send(new ClientboundSetTitlesAnimationPacket(10, 60, 10));
+                            p.connection.send(new ClientboundSetTitleTextPacket(
+                                Component.literal("🏃 KAMU PARKOUR RUNNER!").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD)));
+                            p.connection.send(new ClientboundSetSubtitleTextPacket(
+                                Component.literal("Lari ke Garis Finish Parkour secepatnya untuk bonus waktu!").withStyle(ChatFormatting.YELLOW)));
+                        } else {
+                            p.connection.send(new ClientboundSetTitlesAnimationPacket(10, 60, 10));
+                            p.connection.send(new ClientboundSetTitleTextPacket(
+                                Component.literal("🎯 PARKOUR MINIGAME!").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD)));
+                            p.connection.send(new ClientboundSetSubtitleTextPacket(
+                                Component.literal("🏃 " + runnerName + " sedang berlari di Arena Parkour! Berikan dukungan!").withStyle(ChatFormatting.YELLOW)));
+                        }
+                    }
+                }
+
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
+                broadcastToAll(server, Component.literal("🎯 FASE PARKOUR MINIGAME (PERWAKILAN - 2 MENIT) DIMULAI!").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
+                broadcastToAll(server, Component.literal("🏃 Runner: " + runnerName + " | Capai garis Finish dalam 2 menit!").withStyle(ChatFormatting.YELLOW));
+                broadcastToAll(server, Component.literal("🎁 Berhasil Finish = BONUS +3 MENIT Waktu Pencarian Uang!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
             }
         } else if (phase == GamePhase.HIDING) {
             hidingStartPositions.clear();
@@ -564,6 +658,9 @@ public class DontLieGame {
                 p.removeEffect(MobEffects.MOVEMENT_SPEED);
             }
         }
+
+        // Sync updated game state & phase to all client HUDs immediately
+        syncGameStateToAll(server);
     }
 
     public static class PlayerPos {
@@ -694,6 +791,37 @@ public class DontLieGame {
 
         tickCounter++;
 
+        // Parkour Finish Proximity Detection during MINIGAME Phase
+        if (currentPhase == GamePhase.MINIGAME && !isParkourFinished) {
+            var finish = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourFinish();
+            if (parkourGroupMode) {
+                // Check all alive players in Bareng-bareng mode
+                for (UUID uuid : alivePlayers) {
+                    ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+                    if (p != null) {
+                        double dx = p.getX() - finish.x;
+                        double dy = p.getY() - finish.y;
+                        double dz = p.getZ() - finish.z;
+                        if ((dx * dx + dy * dy + dz * dz) <= 4.0) {
+                            finishParkour(server, p);
+                            break;
+                        }
+                    }
+                }
+            } else if (parkourRunnerUUID != null) {
+                // Check designated runner in Perwakilan mode
+                ServerPlayer runner = server.getPlayerList().getPlayer(parkourRunnerUUID);
+                if (runner != null && isAlive(runner.getUUID())) {
+                    double dx = runner.getX() - finish.x;
+                    double dy = runner.getY() - finish.y;
+                    double dz = runner.getZ() - finish.z;
+                    if ((dx * dx + dy * dy + dz * dz) <= 4.0) {
+                        finishParkour(server, runner);
+                    }
+                }
+            }
+        }
+
         // Sync game state to all clients every 10 ticks (0.5 sec) for HUD overlay
         hudSyncCounter++;
         if (hudSyncCounter >= 10) {
@@ -722,6 +850,40 @@ public class DontLieGame {
                 advancePhase(server);
             }
         }
+    }
+
+    public void finishParkour(MinecraftServer server, ServerPlayer runner) {
+        if (isParkourFinished) return;
+        isParkourFinished = true;
+
+        int timeTaken = customMinigameDuration - phaseTimeRemaining;
+        if (timeTaken <= 0) timeTaken = 1;
+
+        int extraSeconds = 180; // +3 minutes (180 seconds) bonus search time!
+        String modeName = parkourGroupMode ? "BARENG-BARENG" : "PERWAKILAN";
+
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+        broadcastToAll(server, Component.literal("🎉 PARKOUR BERHASIL DISLESAIKAN! 🎉").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("🏃 Runner: " + runner.getScoreboardName() + " (" + modeName + ")").withStyle(ChatFormatting.YELLOW));
+        broadcastToAll(server, Component.literal("⏱️ Waktu Tempuh: " + timeTaken + " detik (Target: < 2 Menit)").withStyle(ChatFormatting.AQUA));
+        broadcastToAll(server, Component.literal("🎁 BONUS WAKTU PENCARIAN: +3 MENIT (+180 Detik)!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (isParticipant(p.getUUID())) {
+                p.level().playSound(null, p.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
+                if (parkourGroupMode && isAlive(p.getUUID())) {
+                    returnPlayerToStartPos(p);
+                }
+            }
+        }
+
+        if (!parkourGroupMode) {
+            returnPlayerToStartPos(runner);
+        }
+
+        setPhase(server, GamePhase.SEARCH);
+        addTime(extraSeconds);
     }
 
     private void syncGameStateToAll(MinecraftServer server) {
@@ -772,7 +934,7 @@ public class DontLieGame {
     private String getPhaseHint(GamePhase phase) {
         return switch (phase) {
             case HIDING -> "Mafia sedang menyembunyikan uang di dalam arena!";
-            case MINIGAME -> "MINIGAME! Kumpulkan poin kelompok untuk memenangkan ekstra waktu pencarian!";
+            case MINIGAME -> "MINIGAME PARKOUR! Capai Finish dalam 2 menit untuk +3 menit bonus waktu pencarian!";
             case SEARCH -> "CARI UANG! Periksa semua chest dan sudut ruangan!";
             case DISCUSSION -> "Kumpul di Meeting Room! Diskusi & Berinterogasi!";
             case VOTING -> "SAATNYA VOTING! Pilih pemain yang dicurigai sebagai Mafia!";
@@ -786,41 +948,37 @@ public class DontLieGame {
             case HIDING -> {
                 for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                     if (isParticipant(p.getUUID()) && getRole(p.getUUID()) == PlayerRole.MAFIA) {
-                        returnMafiaToStartPos(p);
+                        returnPlayerToStartPos(p);
                     }
                 }
                 setPhase(server, GamePhase.MINIGAME);
             }
             case MINIGAME -> {
-                int extraSeconds = 0;
-                if (minigameScore >= 15) {
-                    extraSeconds = 90;
-                } else if (minigameScore >= 10) {
-                    extraSeconds = 60;
-                } else if (minigameScore >= 5) {
-                    extraSeconds = 30;
+                if (parkourGroupMode) {
+                    for (UUID uuid : alivePlayers) {
+                        ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+                        if (p != null) returnPlayerToStartPos(p);
+                    }
+                } else {
+                    ServerPlayer runner = (parkourRunnerUUID != null) ? server.getPlayerList().getPlayer(parkourRunnerUUID) : null;
+                    if (runner != null) {
+                        returnPlayerToStartPos(runner);
+                    }
                 }
 
-                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
-                broadcastToAll(server, Component.literal("  🎯 FASE MINIGAME SELESAI!  ").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
-                broadcastToAll(server, Component.literal("  Total Skor Kelompok: " + minigameScore + " Poin  ").withStyle(ChatFormatting.YELLOW));
-                if (extraSeconds > 0) {
-                    broadcastToAll(server, Component.literal("  🎉 BONUS WAKTU PENCARIAN: +" + extraSeconds + " DETIK!  ").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
-                } else {
-                    broadcastToAll(server, Component.literal("  ⚠️ Skor kelompok belum cukup untuk bonus waktu ekstra (butuh 5+ poin).  ").withStyle(ChatFormatting.RED));
-                }
-                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.RED));
+                broadcastToAll(server, Component.literal("  ⏰ WAKTU PARKOUR 2 MENIT HABIS!  ").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+                broadcastToAll(server, Component.literal("  ⚠️ " + (parkourGroupMode ? "Tidak ada pemain" : "Runner") + " yang berhasil mencapai garis Finish dalam 2 menit.  ").withStyle(ChatFormatting.YELLOW));
+                broadcastToAll(server, Component.literal("  ❌ Tidak mendapatkan bonus waktu pencarian (0 bonus).  ").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+                broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.RED));
 
                 for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                     if (isParticipant(p.getUUID())) {
-                        p.level().playSound(null, p.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
+                        p.level().playSound(null, p.blockPosition(), SoundEvents.VILLAGER_NO, SoundSource.MASTER, 1.0f, 1.0f);
                     }
                 }
 
                 setPhase(server, GamePhase.SEARCH);
-                if (extraSeconds > 0) {
-                    addTime(extraSeconds);
-                }
             }
             case SEARCH -> setPhase(server, GamePhase.DISCUSSION);
             case DISCUSSION -> setPhase(server, GamePhase.VOTING);
@@ -837,7 +995,7 @@ public class DontLieGame {
                     nightSubPhase = 0;
                     resolveNightActions(server);
                     if (checkWinConditions(server)) return;
-                    setPhase(server, GamePhase.SEARCH);
+                    setPhase(server, GamePhase.MINIGAME);
                 }
             }
         }

@@ -111,80 +111,106 @@ public class AdminControlScreen extends Screen {
                 .build()
         );
 
-        // 2. STOP GAME Button
+        // 2. REGISTER ALL & STOP GAME Buttons
+        this.addRenderableWidget(Button.builder(
+                Component.literal("📝 DAFTARKAN SEMUA PEMAIN").withStyle(s -> s.withBold(true)),
+                b -> ModMessages.sendToServer(new AdminActionPacket("REGISTER_ALL")))
+                .bounds(leftColX, actionY + 18, btnWidth, btnHeight)
+                .build()
+        );
+
         this.addRenderableWidget(Button.builder(
                 Component.literal("🛑 HENTIKAN GAME (STOP)").withStyle(s -> s.withBold(true)),
                 b -> {
                     ModMessages.sendToServer(new AdminActionPacket("STOP"));
                     this.onClose();
                 })
-                .bounds(leftColX, actionY + 18, btnWidth, btnHeight)
+                .bounds(leftColX, actionY + 36, btnWidth, btnHeight)
                 .build()
         );
 
-        // 3. GENERATE ARENA & SKIP PHASE Buttons
+        // 3. PARKOUR MODE TOGGLE Button
+        String parkourBtnText = packetData.parkourGroupMode ? "🏃 PARKOUR: BARENG-BARENG" : "🏃 PARKOUR: PERWAKILAN";
+        this.addRenderableWidget(Button.builder(
+                Component.literal(parkourBtnText).withStyle(s -> s.withBold(true)),
+                b -> ModMessages.sendToServer(new AdminActionPacket("TOGGLE_PARKOUR_MODE")))
+                .bounds(leftColX, actionY + 54, btnWidth, btnHeight)
+                .build()
+        );
+
+        // 4. GENERATE ARENA & SKIP PHASE Buttons
         this.addRenderableWidget(Button.builder(
                 Component.literal("🏗️ ARENA"),
                 b -> {
                     ModMessages.sendToServer(new AdminActionPacket("BUILD_ARENA"));
                     this.onClose();
                 })
-                .bounds(leftColX, actionY + 36, btnWidth / 2 - 2, btnHeight)
+                .bounds(leftColX, actionY + 72, btnWidth / 2 - 2, btnHeight)
                 .build()
         );
 
         this.addRenderableWidget(Button.builder(
                 Component.literal("⏩ SKIP FASE"),
                 b -> ModMessages.sendToServer(new AdminActionPacket("SKIP_PHASE")))
-                .bounds(leftColX + btnWidth / 2 + 2, actionY + 36, btnWidth / 2 - 2, btnHeight)
+                .bounds(leftColX + btnWidth / 2 + 2, actionY + 72, btnWidth / 2 - 2, btnHeight)
                 .build()
         );
 
-        // 4. ADD +30s / +60s TIME Buttons
+        // 5. ADD +30s / +60s TIME Buttons
         this.addRenderableWidget(Button.builder(
                 Component.literal("⏱️ +30s"),
                 b -> ModMessages.sendToServer(new AdminActionPacket("ADD_TIME_30")))
-                .bounds(leftColX, actionY + 54, btnWidth / 2 - 2, btnHeight)
+                .bounds(leftColX, actionY + 90, btnWidth / 2 - 2, btnHeight)
                 .build()
         );
 
         this.addRenderableWidget(Button.builder(
                 Component.literal("⏱️ +60s"),
                 b -> ModMessages.sendToServer(new AdminActionPacket("ADD_TIME_60")))
-                .bounds(leftColX + btnWidth / 2 + 2, actionY + 54, btnWidth / 2 - 2, btnHeight)
+                .bounds(leftColX + btnWidth / 2 + 2, actionY + 90, btnWidth / 2 - 2, btnHeight)
                 .build()
         );
 
-        // 5. CLEAR MANUAL ROLES & EXIT Buttons
+        // 6. CLEAR MANUAL ROLES & EXIT Buttons
         this.addRenderableWidget(Button.builder(
                 Component.literal("🧹 RESET ROLE"),
                 b -> ModMessages.sendToServer(new AdminActionPacket("CLEAR_FORCED_ROLES")))
-                .bounds(leftColX, actionY + 72, btnWidth / 2 - 2, btnHeight)
+                .bounds(leftColX, actionY + 108, btnWidth / 2 - 2, btnHeight)
                 .build()
         );
 
         this.addRenderableWidget(Button.builder(
                 Component.literal("❌ TUTUP"),
                 b -> this.onClose())
-                .bounds(leftColX + btnWidth / 2 + 2, actionY + 72, btnWidth / 2 - 2, btnHeight)
+                .bounds(leftColX + btnWidth / 2 + 2, actionY + 108, btnWidth / 2 - 2, btnHeight)
                 .build()
         );
 
-        // --- PLAYER ROSTER ROLE SELECTION BUTTONS (Right Column) ---
+        // --- PLAYER ROSTER ROLE SELECTION & REGISTRATION BUTTONS (Right Column) ---
         List<OpenAdminMenuPacket.AdminPlayerEntry> players = packetData.playerEntries;
         int rosterTop = 88;
         for (int i = 0; i < Math.min(6, players.size()); i++) {
             OpenAdminMenuPacket.AdminPlayerEntry entry = players.get(i);
-            int rowY = rosterTop + 18 + (i * 24);
+            int rowY = rosterTop + 20 + (i * 24);
 
             if (!packetData.isGameRunning) {
+                // 1. Registration Toggle Button per player
+                String regText = entry.isRegistered ? "✅ REG" : "➕ REG";
+                this.addRenderableWidget(Button.builder(
+                        Component.literal(regText),
+                        b -> ModMessages.sendToServer(new AdminActionPacket("TOGGLE_REGISTER", entry.uuid.toString(), "")))
+                        .bounds(rightColX + 82, rowY, 48, 18)
+                        .build()
+                );
+
+                // 2. Role Override Button per player
                 String nextRole = getNextRoleName(entry.forcedRoleName);
                 String buttonText = "🎭 " + entry.forcedRoleName;
 
                 this.addRenderableWidget(Button.builder(
                         Component.literal(buttonText),
                         b -> ModMessages.sendToServer(new AdminActionPacket("SET_PLAYER_ROLE", entry.uuid.toString(), nextRole)))
-                        .bounds(rightColX + 115, rowY, 70, 18)
+                        .bounds(rightColX + 133, rowY, 52, 18)
                         .build()
                 );
             }
@@ -266,35 +292,37 @@ public class AdminControlScreen extends Screen {
         int rightColX = centerX + 5;
 
         // 3. Status Card Box
-        guiGraphics.fill(rightColX, 42, rightColX + panelWidth, 84, 0xAA111111);
+        guiGraphics.fill(rightColX, 42, rightColX + panelWidth, 86, 0xAA111111);
         guiGraphics.fill(rightColX, 42, rightColX + panelWidth, 43, 0x55FFFFFF);
 
         String statusStr = packetData.isGameRunning ? "BERJALAN" : "TIDAK AKTIF";
         int statusColor = packetData.isGameRunning ? 0xFF55FF55 : 0xFFFF5555;
-        guiGraphics.drawString(this.font, "Status: " + statusStr, rightColX + 8, 48, statusColor);
-        guiGraphics.drawString(this.font, "Fase: " + packetData.phaseName, rightColX + 8, 60, 0xFFFFFF55);
-        guiGraphics.drawString(this.font, "Sisa Waktu: " + packetData.timeRemaining + " s", rightColX + 8, 72, 0xFF55FFFF);
+        String pkModeStr = packetData.parkourGroupMode ? "Bareng-bareng" : "Perwakilan";
+        guiGraphics.drawString(this.font, "Status: " + statusStr, rightColX + 8, 46, statusColor);
+        guiGraphics.drawString(this.font, "Fase: " + packetData.phaseName, rightColX + 8, 56, 0xFFFFFF55);
+        guiGraphics.drawString(this.font, "Sisa Waktu: " + packetData.timeRemaining + " s", rightColX + 8, 66, 0xFF55FFFF);
+        guiGraphics.drawString(this.font, "Mode Parkour: " + pkModeStr, rightColX + 8, 76, 0xFFFF77FF);
 
         // 4. Player Roster & Role Override Box
         guiGraphics.fill(rightColX, 88, rightColX + panelWidth, 270, 0xAA111111);
         guiGraphics.fill(rightColX, 88, rightColX + panelWidth, 89, 0x55FFFFFF);
 
-        guiGraphics.drawString(this.font, "👥 ROLE PEMAIN (" + packetData.playerEntries.size() + ")", rightColX + 8, 93, 0xFFFFAA00);
+        guiGraphics.drawString(this.font, "👥 ROLE & REGISTER (" + packetData.playerEntries.size() + ")", rightColX + 8, 93, 0xFFFFAA00);
         guiGraphics.fill(rightColX + 6, 103, rightColX + panelWidth - 6, 104, 0x55FFFFFF);
 
         // Render Player List Entries
-        List<OpenAdminMenuPacket.AdminPlayerEntry> players = packetData.playerEntries;
+        List<OpenAdminMenuPacket.AdminPlayerEntry> playersList = packetData.playerEntries;
         int pY = 108;
-        for (int i = 0; i < Math.min(6, players.size()); i++) {
-            OpenAdminMenuPacket.AdminPlayerEntry entry = players.get(i);
+        for (int i = 0; i < Math.min(6, playersList.size()); i++) {
+            OpenAdminMenuPacket.AdminPlayerEntry entry = playersList.get(i);
             int color;
             String statusText;
             if (packetData.isGameRunning) {
                 color = entry.isAlive ? 0xFF55FF55 : 0xFFFF5555;
                 statusText = entry.roleDisplayName + " " + (entry.isAlive ? "[HIDUP]" : "[ELIM]");
             } else {
-                color = entry.forcedRoleName.equalsIgnoreCase("AUTO") ? 0xFFAAAAAA : 0xFFFFD700;
-                statusText = entry.forcedRoleName.equalsIgnoreCase("AUTO") ? "Mode: AUTO" : "Set: " + entry.forcedRoleName;
+                color = entry.isRegistered ? 0xFF55FF55 : 0xFFAAAAAA;
+                statusText = entry.isRegistered ? "Status: TERDAFTAR" : "Status: Belum Reg";
             }
             guiGraphics.drawString(this.font, entry.name, rightColX + 8, pY, 0xFFFFFFFF);
             guiGraphics.drawString(this.font, statusText, rightColX + 8, pY + 10, color);

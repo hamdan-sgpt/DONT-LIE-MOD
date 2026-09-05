@@ -59,11 +59,12 @@ public class OpenAdminMenuPacket {
     public final int mafiaCount;
     public final int doctorCount;
     public final int policeCount;
+    public final boolean parkourGroupMode;
     public final List<AdminPlayerEntry> playerEntries;
 
     public OpenAdminMenuPacket(boolean isGameRunning, String phaseName, int timeRemaining, int aliveCount, int totalCount,
                                 int minigameDuration, int mafiaCount, int doctorCount, int policeCount,
-                                List<AdminPlayerEntry> playerEntries) {
+                                boolean parkourGroupMode, List<AdminPlayerEntry> playerEntries) {
         this.isGameRunning = isGameRunning;
         this.phaseName = phaseName;
         this.timeRemaining = timeRemaining;
@@ -73,6 +74,7 @@ public class OpenAdminMenuPacket {
         this.mafiaCount = mafiaCount;
         this.doctorCount = doctorCount;
         this.policeCount = policeCount;
+        this.parkourGroupMode = parkourGroupMode;
         this.playerEntries = playerEntries;
     }
 
@@ -86,6 +88,7 @@ public class OpenAdminMenuPacket {
         this.mafiaCount = buf.readInt();
         this.doctorCount = buf.readInt();
         this.policeCount = buf.readInt();
+        this.parkourGroupMode = buf.readBoolean();
         int size = buf.readInt();
         this.playerEntries = new ArrayList<>();
         for (int i = 0; i < size; i++) {
@@ -103,6 +106,7 @@ public class OpenAdminMenuPacket {
         buf.writeInt(mafiaCount);
         buf.writeInt(doctorCount);
         buf.writeInt(policeCount);
+        buf.writeBoolean(parkourGroupMode);
         buf.writeInt(playerEntries.size());
         for (AdminPlayerEntry entry : playerEntries) {
             entry.toBytes(buf);
@@ -143,6 +147,7 @@ public class OpenAdminMenuPacket {
                 game.getCustomMafiaCount(),
                 game.getCustomDoctorCount(),
                 game.getCustomPoliceCount(),
+                game.isParkourGroupMode(),
                 entries
         );
 

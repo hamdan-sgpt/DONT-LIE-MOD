@@ -51,4 +51,16 @@ public class MinigameInteractionHandler {
 
         game.addMinigameScore(player, 1);
     }
+
+    @SubscribeEvent
+    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (event.getLevel().isClientSide()) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+
+        DontLieGame game = DontLieGame.getInstance();
+        if (!game.isGameRunning() || game.getCurrentPhase() != GamePhase.MINIGAME) return;
+        if (!game.isParticipant(player.getUUID()) || !game.isAlive(player.getUUID())) return;
+
+        game.addMinigameScore(player, 1);
+    }
 }

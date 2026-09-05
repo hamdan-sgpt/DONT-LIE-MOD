@@ -91,23 +91,16 @@ public class ArenaBuilder {
     private static void loadMapFilesAsync(MinecraftServer server, ServerPlayer triggerPlayer, String mapName) {
         final Path[] sourceDir = {null};
 
-        // 1. Search directly inside the Mod .JAR assets/resources
-        ModList.get().getModContainerById(CorazonMod.MOD_ID).ifPresent(container -> {
-            try {
-                Path p = container.getModInfo().getOwningFile().getFile().findResource("maps/" + mapName);
-                if (Files.exists(p)) {
-                    sourceDir[0] = p;
-                }
-            } catch (Exception ignored) {}
-        });
-
-        // 2. Search local dev environment paths
+        // 1. Search local dev environment paths FIRST (prefer MAP-DONT-LIE(update))
         Path baseDir = Paths.get(".").toAbsolutePath().normalize();
         if (baseDir.getFileName() != null && baseDir.getFileName().toString().startsWith("run")) {
             baseDir = baseDir.getParent();
         }
 
         List<Path> candidates = List.of(
+            baseDir.resolve("MAP-DONT-LIE(update)"),
+            Paths.get("MAP-DONT-LIE(update)"),
+            Paths.get("../MAP-DONT-LIE(update)"),
             baseDir.resolve("src/main/resources/maps/" + mapName),
             baseDir.resolve(mapName),
             Paths.get("src/main/resources/maps/" + mapName),
@@ -115,18 +108,30 @@ public class ArenaBuilder {
             Paths.get("../" + mapName)
         );
 
-        if (sourceDir[0] == null || !Files.exists(sourceDir[0])) {
-            for (Path candidate : candidates) {
-                if (Files.exists(candidate)) {
-                    sourceDir[0] = candidate;
-                    break;
-                }
+        for (Path candidate : candidates) {
+            if (Files.exists(candidate)) {
+                sourceDir[0] = candidate;
+                CorazonMod.LOGGER.info("[Don't Lie Map Loader] Using local map directory: {}", candidate);
+                break;
             }
+        }
+
+        // 2. Search inside Mod .JAR assets/resources if local folder not found
+        if (sourceDir[0] == null) {
+            ModList.get().getModContainerById(CorazonMod.MOD_ID).ifPresent(container -> {
+                try {
+                    Path p = container.getModInfo().getOwningFile().getFile().findResource("maps/" + mapName);
+                    if (Files.exists(p)) {
+                        sourceDir[0] = p;
+                        CorazonMod.LOGGER.info("[Don't Lie Map Loader] Using JAR resource map: {}", p);
+                    }
+                } catch (Exception ignored) {}
+            });
         }
 
         if (sourceDir[0] == null || !Files.exists(sourceDir[0])) {
             IS_GENERATING.set(false);
-            triggerPlayer.sendSystemMessage(Component.literal("❌ Folder map built-in '" + mapName + "' tidak ditemukan di JAR!").withStyle(net.minecraft.ChatFormatting.RED));
+            triggerPlayer.sendSystemMessage(Component.literal("❌ Folder map built-in '" + mapName + "' tidak ditemukan!").withStyle(net.minecraft.ChatFormatting.RED));
             return;
         }
 
@@ -169,12 +174,16 @@ public class ArenaBuilder {
 
         final BlockPos spawnPos = nbtDetectedPos;
 
-        // Target custom dimension save directory (like Multiverse-Core)
+        // Target custom dimension save directory & main world directory
         Path worldDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).getParent();
         Path dimensionTargetDir = worldDir.resolve("dimensions").resolve(CorazonMod.MOD_ID).resolve("dontlie_world");
 
-        // Copy map files strictly into custom dimension target directory (do NOT overwrite Overworld!)
+        // Copy updated map files into custom dimension target directory AND main world directory
         copyDirectory(sourceDir[0], dimensionTargetDir);
+
+        if (Files.exists(sourceDir[0].resolve("region"))) {
+            copyDirectory(sourceDir[0].resolve("region"), worldDir.resolve("region"));
+        }
 
         triggerPlayer.sendSystemMessage(Component.literal("✔ Ekstraksi map built-in '" + mapName + "' ke world 'corazonmod:dontlie_world' selesai! Preloading chunk di X: " + spawnPos.getX() + ", Y: " + spawnPos.getY() + ", Z: " + spawnPos.getZ() + "...").withStyle(net.minecraft.ChatFormatting.GREEN));
 
