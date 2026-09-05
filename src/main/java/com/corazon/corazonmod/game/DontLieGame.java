@@ -71,6 +71,7 @@ public class DontLieGame {
     private boolean isRunnerVotingPhase = false;
     private final Map<UUID, UUID> runnerVotes = new HashMap<>();
     private final Set<UUID> claimedCheckpoints = new HashSet<>();
+    private int accumulatedBonusSearchTime = 0;
 
     public boolean isParkourEnabled() {
         return isParkourEnabled;
@@ -662,7 +663,13 @@ public class DontLieGame {
         } else if (phase == GamePhase.MINIGAME && customMinigameDuration > 0) {
             this.phaseTimeRemaining = customMinigameDuration;
         } else if (phase == GamePhase.SEARCH && customSearchDuration > 0) {
-            this.phaseTimeRemaining = customSearchDuration;
+            this.phaseTimeRemaining = customSearchDuration + accumulatedBonusSearchTime;
+            if (accumulatedBonusSearchTime > 0) {
+                int totalSec = this.phaseTimeRemaining;
+                broadcastToAll(server, Component.literal("🎁 Fase Pencarian Uang dimulai dengan TOTAL BONUS +" + formatTime(accumulatedBonusSearchTime) + " (" + formatTime(totalSec) + " total waktu)!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+                this.accumulatedBonusSearchTime = 0;
+            }
+        }
         } else if (phase == GamePhase.DISCUSSION && customDiscussionDuration > 0) {
             this.phaseTimeRemaining = customDiscussionDuration;
         } else if (phase == GamePhase.VOTING && customVotingDuration > 0) {
@@ -1155,11 +1162,12 @@ public class DontLieGame {
 
     public void triggerParkourCheckpointBonus(MinecraftServer server, ServerPlayer player) {
         int extraSeconds = 90; // +1.5 minutes (90 seconds) bonus search time!
+        this.accumulatedBonusSearchTime += extraSeconds;
 
         broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
         broadcastToAll(server, Component.literal("⭐ CHECKPOINT PARKOUR DICAPAI! ⭐").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
         broadcastToAll(server, Component.literal("🏃 Pemain: " + player.getScoreboardName()).withStyle(ChatFormatting.AQUA));
-        broadcastToAll(server, Component.literal("🎁 BONUS WAKTU PENCARIAN: +1.5 MENIT (+90 Detik)! (1x per ronde)").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("🎁 BONUS WAKTU PENCARIAN DIKUMPULKAN: +1.5 MENIT (+90 Detik)! (1x per ronde)").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
         broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
 
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
@@ -1167,8 +1175,6 @@ public class DontLieGame {
                 p.level().playSound(null, p.blockPosition(), SoundEvents.PLAYER_LEVELUP, SoundSource.MASTER, 1.0f, 1.2f);
             }
         }
-
-        addTime(extraSeconds);
     }
 
     public void finishParkour(MinecraftServer server, ServerPlayer runner) {
@@ -1201,8 +1207,8 @@ public class DontLieGame {
             returnPlayerToStartPos(runner);
         }
 
+        this.accumulatedBonusSearchTime += extraSeconds;
         setPhase(server, GamePhase.SEARCH);
-        addTime(extraSeconds);
     }
 
     private void syncGameStateToAll(MinecraftServer server) {
