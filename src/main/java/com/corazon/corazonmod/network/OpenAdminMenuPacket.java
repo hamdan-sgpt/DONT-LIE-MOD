@@ -56,25 +56,27 @@ public class OpenAdminMenuPacket {
     public final int aliveCount;
     public final int totalCount;
     public final int minigameDuration;
+    public final int runnerVoteDuration;
     public final int mafiaCount;
     public final int doctorCount;
     public final int policeCount;
-    public final boolean parkourGroupMode;
+    public final boolean isParkourEnabled;
     public final List<AdminPlayerEntry> playerEntries;
 
     public OpenAdminMenuPacket(boolean isGameRunning, String phaseName, int timeRemaining, int aliveCount, int totalCount,
-                                int minigameDuration, int mafiaCount, int doctorCount, int policeCount,
-                                boolean parkourGroupMode, List<AdminPlayerEntry> playerEntries) {
+                                int minigameDuration, int runnerVoteDuration, int mafiaCount, int doctorCount, int policeCount,
+                                boolean isParkourEnabled, List<AdminPlayerEntry> playerEntries) {
         this.isGameRunning = isGameRunning;
         this.phaseName = phaseName;
         this.timeRemaining = timeRemaining;
         this.aliveCount = aliveCount;
         this.totalCount = totalCount;
         this.minigameDuration = minigameDuration;
+        this.runnerVoteDuration = runnerVoteDuration;
         this.mafiaCount = mafiaCount;
         this.doctorCount = doctorCount;
         this.policeCount = policeCount;
-        this.parkourGroupMode = parkourGroupMode;
+        this.isParkourEnabled = isParkourEnabled;
         this.playerEntries = playerEntries;
     }
 
@@ -85,10 +87,11 @@ public class OpenAdminMenuPacket {
         this.aliveCount = buf.readInt();
         this.totalCount = buf.readInt();
         this.minigameDuration = buf.readInt();
+        this.runnerVoteDuration = buf.readInt();
         this.mafiaCount = buf.readInt();
         this.doctorCount = buf.readInt();
         this.policeCount = buf.readInt();
-        this.parkourGroupMode = buf.readBoolean();
+        this.isParkourEnabled = buf.readBoolean();
         int size = buf.readInt();
         this.playerEntries = new ArrayList<>();
         for (int i = 0; i < size; i++) {
@@ -103,10 +106,11 @@ public class OpenAdminMenuPacket {
         buf.writeInt(aliveCount);
         buf.writeInt(totalCount);
         buf.writeInt(minigameDuration);
+        buf.writeInt(runnerVoteDuration);
         buf.writeInt(mafiaCount);
         buf.writeInt(doctorCount);
         buf.writeInt(policeCount);
-        buf.writeBoolean(parkourGroupMode);
+        buf.writeBoolean(isParkourEnabled);
         buf.writeInt(playerEntries.size());
         for (AdminPlayerEntry entry : playerEntries) {
             entry.toBytes(buf);
@@ -144,10 +148,11 @@ public class OpenAdminMenuPacket {
                 game.getAliveCount(),
                 game.getTotalPlayers(),
                 game.getCustomMinigameDuration(),
+                game.getCustomRunnerVoteDuration(),
                 game.getCustomMafiaCount(),
                 game.getCustomDoctorCount(),
                 game.getCustomPoliceCount(),
-                game.isParkourGroupMode(),
+                game.isParkourEnabled(),
                 entries
         );
 

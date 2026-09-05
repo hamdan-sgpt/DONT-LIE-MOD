@@ -23,6 +23,7 @@ public class AdminActionPacket {
     private final int searchDurationSeconds;
     private final int discussionDurationSeconds;
     private final int votingDurationSeconds;
+    private final int runnerVoteDurationSeconds;
     private final int mafiaCount;
     private final int doctorCount;
     private final int policeCount;
@@ -30,21 +31,21 @@ public class AdminActionPacket {
     private final String roleName;
 
     public AdminActionPacket(String action) {
-        this(action, 60, 45, 300, 90, 30, -1, 1, 1, "", "");
+        this(action, 60, 120, 300, 90, 30, 15, -1, 1, 1, "", "");
     }
 
     public AdminActionPacket(String action, String targetUUIDStr, String roleName) {
-        this(action, 60, 45, 300, 90, 30, -1, 1, 1, targetUUIDStr, roleName);
+        this(action, 60, 120, 300, 90, 30, 15, -1, 1, 1, targetUUIDStr, roleName);
     }
 
     public AdminActionPacket(String action, int hidingDurationSeconds, int minigameDurationSeconds, int searchDurationSeconds, int discussionDurationSeconds, int votingDurationSeconds,
-                            int mafiaCount, int doctorCount, int policeCount) {
+                            int runnerVoteDurationSeconds, int mafiaCount, int doctorCount, int policeCount) {
         this(action, hidingDurationSeconds, minigameDurationSeconds, searchDurationSeconds, discussionDurationSeconds, votingDurationSeconds,
-             mafiaCount, doctorCount, policeCount, "", "");
+             runnerVoteDurationSeconds, mafiaCount, doctorCount, policeCount, "", "");
     }
 
     public AdminActionPacket(String action, int hidingDurationSeconds, int minigameDurationSeconds, int searchDurationSeconds, int discussionDurationSeconds, int votingDurationSeconds,
-                            int mafiaCount, int doctorCount, int policeCount,
+                            int runnerVoteDurationSeconds, int mafiaCount, int doctorCount, int policeCount,
                             String targetUUIDStr, String roleName) {
         this.action = action;
         this.hidingDurationSeconds = hidingDurationSeconds;
@@ -52,6 +53,7 @@ public class AdminActionPacket {
         this.searchDurationSeconds = searchDurationSeconds;
         this.discussionDurationSeconds = discussionDurationSeconds;
         this.votingDurationSeconds = votingDurationSeconds;
+        this.runnerVoteDurationSeconds = runnerVoteDurationSeconds;
         this.mafiaCount = mafiaCount;
         this.doctorCount = doctorCount;
         this.policeCount = policeCount;
@@ -66,6 +68,7 @@ public class AdminActionPacket {
         this.searchDurationSeconds = buf.readInt();
         this.discussionDurationSeconds = buf.readInt();
         this.votingDurationSeconds = buf.readInt();
+        this.runnerVoteDurationSeconds = buf.readInt();
         this.mafiaCount = buf.readInt();
         this.doctorCount = buf.readInt();
         this.policeCount = buf.readInt();
@@ -80,6 +83,7 @@ public class AdminActionPacket {
         buf.writeInt(searchDurationSeconds);
         buf.writeInt(discussionDurationSeconds);
         buf.writeInt(votingDurationSeconds);
+        buf.writeInt(runnerVoteDurationSeconds);
         buf.writeInt(mafiaCount);
         buf.writeInt(doctorCount);
         buf.writeInt(policeCount);
@@ -107,7 +111,7 @@ public class AdminActionPacket {
                     if (game.isGameRunning()) {
                         player.sendSystemMessage(Component.literal("⚠️ Game sudah sedang berjalan!").withStyle(net.minecraft.ChatFormatting.YELLOW));
                     } else {
-                        game.setCustomDurations(hidingDurationSeconds, minigameDurationSeconds, searchDurationSeconds, discussionDurationSeconds, votingDurationSeconds);
+                        game.setCustomDurations(hidingDurationSeconds, minigameDurationSeconds, searchDurationSeconds, discussionDurationSeconds, votingDurationSeconds, runnerVoteDurationSeconds);
                         game.setCustomRoleCounts(mafiaCount, doctorCount, policeCount);
                         game.startNewGame(player.getServer(), null);
                     }
@@ -183,10 +187,10 @@ public class AdminActionPacket {
                     game.clearRegisteredPlayers(player.getServer());
                     OpenAdminMenuPacket.sendToAdmin(player);
                 }
-                case "TOGGLE_PARKOUR_MODE" -> {
-                    game.toggleParkourGroupMode();
-                    String modeName = game.isParkourGroupMode() ? "BARENG-BARENG (SEMUA PEMAIN)" : "PERWAKILAN (1 PEMAIN)";
-                    player.sendSystemMessage(Component.literal("[Don't Lie] 🏃 Mode Parkour Minigame diubah ke: " + modeName).withStyle(net.minecraft.ChatFormatting.GOLD));
+                case "TOGGLE_PARKOUR_ENABLED", "TOGGLE_PARKOUR_MODE" -> {
+                    game.toggleParkourEnabled();
+                    String status = game.isParkourEnabled() ? "AKTIF (ON)" : "NONAKTIF (OFF)";
+                    player.sendSystemMessage(Component.literal("[Don't Lie] 🏃 Minigame Parkour: " + status).withStyle(net.minecraft.ChatFormatting.GOLD));
                     OpenAdminMenuPacket.sendToAdmin(player);
                 }
                 case "REQUEST_OPEN_MENU" -> {

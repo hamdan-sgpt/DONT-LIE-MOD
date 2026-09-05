@@ -57,11 +57,35 @@ public class ModMessages {
                 .consumerMainThread(OpenAdminMenuPacket::handle)
                 .add();
 
+        net.messageBuilder(OpenRunnerSelectionPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(OpenRunnerSelectionPacket::new)
+                .encoder(OpenRunnerSelectionPacket::toBytes)
+                .consumerMainThread(OpenRunnerSelectionPacket::handle)
+                .add();
+
+        net.messageBuilder(OpenParkourModeVotePacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(OpenParkourModeVotePacket::new)
+                .encoder(OpenParkourModeVotePacket::toBytes)
+                .consumerMainThread(OpenParkourModeVotePacket::handle)
+                .add();
+
         // Client -> Server packets
         net.messageBuilder(VotePlayerPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
                 .decoder(VotePlayerPacket::new)
                 .encoder(VotePlayerPacket::toBytes)
                 .consumerMainThread(VotePlayerPacket::handle)
+                .add();
+
+        net.messageBuilder(VoteRunnerPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(VoteRunnerPacket::new)
+                .encoder(VoteRunnerPacket::toBytes)
+                .consumerMainThread(VoteRunnerPacket::handle)
+                .add();
+
+        net.messageBuilder(VoteParkourModePacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(VoteParkourModePacket::new)
+                .encoder(VoteParkourModePacket::toBytes)
+                .consumerMainThread(VoteParkourModePacket::handle)
                 .add();
 
         net.messageBuilder(NightActionPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)

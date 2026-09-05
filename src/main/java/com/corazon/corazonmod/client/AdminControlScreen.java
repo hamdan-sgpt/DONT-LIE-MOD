@@ -23,6 +23,7 @@ public class AdminControlScreen extends Screen {
     private EditBox searchDurationBox;
     private EditBox discussionDurationBox;
     private EditBox votingDurationBox;
+    private EditBox runnerVoteDurationBox;
 
     private EditBox mafiaCountBox;
     private EditBox doctorCountBox;
@@ -49,62 +50,68 @@ public class AdminControlScreen extends Screen {
         int btnHeight = 16;
 
         // --- Custom Phase Duration Inputs ---
-        this.hidingDurationBox = new EditBox(this.font, leftColX + 115, 45, 65, 12, Component.literal("Hiding (s)"));
+        this.hidingDurationBox = new EditBox(this.font, leftColX + 115, 43, 65, 11, Component.literal("Hiding (s)"));
         this.hidingDurationBox.setFilter(s -> s.matches("\\d*"));
         this.hidingDurationBox.setValue("60");
         this.addRenderableWidget(this.hidingDurationBox);
 
-        this.minigameDurationBox = new EditBox(this.font, leftColX + 115, 59, 65, 12, Component.literal("Minigame (s)"));
+        this.minigameDurationBox = new EditBox(this.font, leftColX + 115, 55, 65, 11, Component.literal("Minigame (s)"));
         this.minigameDurationBox.setFilter(s -> s.matches("\\d*"));
-        this.minigameDurationBox.setValue(packetData.minigameDuration > 0 ? String.valueOf(packetData.minigameDuration) : "45");
+        this.minigameDurationBox.setValue(packetData.minigameDuration > 0 ? String.valueOf(packetData.minigameDuration) : "120");
         this.addRenderableWidget(this.minigameDurationBox);
 
-        this.searchDurationBox = new EditBox(this.font, leftColX + 115, 73, 65, 12, Component.literal("Search (s)"));
+        this.searchDurationBox = new EditBox(this.font, leftColX + 115, 67, 65, 11, Component.literal("Search (s)"));
         this.searchDurationBox.setFilter(s -> s.matches("\\d*"));
         this.searchDurationBox.setValue("300");
         this.addRenderableWidget(this.searchDurationBox);
 
-        this.discussionDurationBox = new EditBox(this.font, leftColX + 115, 87, 65, 12, Component.literal("Discussion (s)"));
+        this.discussionDurationBox = new EditBox(this.font, leftColX + 115, 79, 65, 11, Component.literal("Discussion (s)"));
         this.discussionDurationBox.setFilter(s -> s.matches("\\d*"));
         this.discussionDurationBox.setValue("90");
         this.addRenderableWidget(this.discussionDurationBox);
 
-        this.votingDurationBox = new EditBox(this.font, leftColX + 115, 101, 65, 12, Component.literal("Voting (s)"));
+        this.votingDurationBox = new EditBox(this.font, leftColX + 115, 91, 65, 11, Component.literal("Voting (s)"));
         this.votingDurationBox.setFilter(s -> s.matches("\\d*"));
         this.votingDurationBox.setValue("30");
         this.addRenderableWidget(this.votingDurationBox);
 
+        this.runnerVoteDurationBox = new EditBox(this.font, leftColX + 115, 103, 65, 11, Component.literal("Runner Vote (s)"));
+        this.runnerVoteDurationBox.setFilter(s -> s.matches("\\d*"));
+        this.runnerVoteDurationBox.setValue(packetData.runnerVoteDuration > 0 ? String.valueOf(packetData.runnerVoteDuration) : "15");
+        this.addRenderableWidget(this.runnerVoteDurationBox);
+
         // --- Custom Role Count Inputs ---
-        this.mafiaCountBox = new EditBox(this.font, leftColX + 115, 124, 65, 12, Component.literal("Mafia Count"));
+        this.mafiaCountBox = new EditBox(this.font, leftColX + 115, 122, 65, 11, Component.literal("Mafia Count"));
         this.mafiaCountBox.setValue(packetData.mafiaCount == -1 ? "Auto" : String.valueOf(packetData.mafiaCount));
         this.addRenderableWidget(this.mafiaCountBox);
 
-        this.doctorCountBox = new EditBox(this.font, leftColX + 115, 138, 65, 12, Component.literal("Doctor Count"));
+        this.doctorCountBox = new EditBox(this.font, leftColX + 115, 134, 65, 11, Component.literal("Doctor Count"));
         this.doctorCountBox.setValue(packetData.doctorCount == -1 ? "Auto" : String.valueOf(packetData.doctorCount));
         this.addRenderableWidget(this.doctorCountBox);
 
-        this.policeCountBox = new EditBox(this.font, leftColX + 115, 152, 65, 12, Component.literal("Police Count"));
+        this.policeCountBox = new EditBox(this.font, leftColX + 115, 146, 65, 11, Component.literal("Police Count"));
         this.policeCountBox.setValue(packetData.policeCount == -1 ? "Auto" : String.valueOf(packetData.policeCount));
         this.addRenderableWidget(this.policeCountBox);
 
         // --- ADMIN ACTION BUTTONS ---
-        int actionY = 180;
+        int actionY = 175;
 
         // 1. START GAME Button
         this.addRenderableWidget(Button.builder(
                 Component.literal("🚀 MULAI GAME (START)").withStyle(s -> s.withBold(true)),
                 b -> {
                     int hidingSec = parseDurationOrDefault(this.hidingDurationBox.getValue(), 60);
-                    int minigameSec = parseDurationOrDefault(this.minigameDurationBox.getValue(), 45);
+                    int minigameSec = parseDurationOrDefault(this.minigameDurationBox.getValue(), 120);
                     int searchSec = parseDurationOrDefault(this.searchDurationBox.getValue(), 300);
                     int discussionSec = parseDurationOrDefault(this.discussionDurationBox.getValue(), 90);
                     int votingSec = parseDurationOrDefault(this.votingDurationBox.getValue(), 30);
+                    int runnerVoteSec = parseDurationOrDefault(this.runnerVoteDurationBox.getValue(), 15);
 
                     int mafiaCount = parseRoleCount(this.mafiaCountBox.getValue(), -1);
                     int doctorCount = parseRoleCount(this.doctorCountBox.getValue(), 1);
                     int policeCount = parseRoleCount(this.policeCountBox.getValue(), 1);
 
-                    ModMessages.sendToServer(new AdminActionPacket("START", hidingSec, minigameSec, searchSec, discussionSec, votingSec, mafiaCount, doctorCount, policeCount));
+                    ModMessages.sendToServer(new AdminActionPacket("START", hidingSec, minigameSec, searchSec, discussionSec, votingSec, runnerVoteSec, mafiaCount, doctorCount, policeCount));
                     this.onClose();
                 })
                 .bounds(leftColX, actionY, btnWidth, btnHeight)
@@ -129,11 +136,11 @@ public class AdminControlScreen extends Screen {
                 .build()
         );
 
-        // 3. PARKOUR MODE TOGGLE Button
-        String parkourBtnText = packetData.parkourGroupMode ? "🏃 PARKOUR: BARENG-BARENG" : "🏃 PARKOUR: PERWAKILAN";
+        // 3. PARKOUR MINIGAME ENABLED TOGGLE Button
+        String parkourBtnText = packetData.isParkourEnabled ? "🏃 PARKOUR MINIGAME: [ON]" : "🏃 PARKOUR MINIGAME: [OFF]";
         this.addRenderableWidget(Button.builder(
                 Component.literal(parkourBtnText).withStyle(s -> s.withBold(true)),
-                b -> ModMessages.sendToServer(new AdminActionPacket("TOGGLE_PARKOUR_MODE")))
+                b -> ModMessages.sendToServer(new AdminActionPacket("TOGGLE_PARKOUR_ENABLED")))
                 .bounds(leftColX, actionY + 54, btnWidth, btnHeight)
                 .build()
         );
@@ -269,24 +276,25 @@ public class AdminControlScreen extends Screen {
         int panelWidth = 190;
 
         // 1. Phase Durations Box
-        guiGraphics.fill(leftColX, 40, leftColX + panelWidth, 118, 0xAA111111);
-        guiGraphics.fill(leftColX, 40, leftColX + panelWidth, 41, 0x55FFFFFF);
-        guiGraphics.drawString(this.font, "⏱️ DURASI FASE (DETIK)", leftColX + 6, 43, 0xFFFFD700);
+        guiGraphics.fill(leftColX, 38, leftColX + panelWidth, 117, 0xAA111111);
+        guiGraphics.fill(leftColX, 38, leftColX + panelWidth, 39, 0x55FFFFFF);
+        guiGraphics.drawString(this.font, "⏱️ DURASI FASE (DETIK)", leftColX + 6, 41, 0xFFFFD700);
 
-        guiGraphics.drawString(this.font, "Hiding:", leftColX + 8, 47, 0xFFFFAA00);
-        guiGraphics.drawString(this.font, "Minigame:", leftColX + 8, 61, 0xFFFF77FF);
-        guiGraphics.drawString(this.font, "Search:", leftColX + 8, 75, 0xFFFFFF55);
-        guiGraphics.drawString(this.font, "Diskusi:", leftColX + 8, 89, 0xFF55FFFF);
-        guiGraphics.drawString(this.font, "Voting:", leftColX + 8, 103, 0xFFFF55FF);
+        guiGraphics.drawString(this.font, "Hiding:", leftColX + 8, 45, 0xFFFFAA00);
+        guiGraphics.drawString(this.font, "Minigame:", leftColX + 8, 57, 0xFFFF77FF);
+        guiGraphics.drawString(this.font, "Search:", leftColX + 8, 69, 0xFFFFFF55);
+        guiGraphics.drawString(this.font, "Diskusi:", leftColX + 8, 81, 0xFF55FFFF);
+        guiGraphics.drawString(this.font, "Voting:", leftColX + 8, 93, 0xFFFF55FF);
+        guiGraphics.drawString(this.font, "Vote Runner:", leftColX + 8, 105, 0xFFFFAAFF);
 
         // 2. Role Counts Box
-        guiGraphics.fill(leftColX, 116, leftColX + panelWidth, 172, 0xAA111111);
-        guiGraphics.fill(leftColX, 116, leftColX + panelWidth, 117, 0x55FFFFFF);
-        guiGraphics.drawString(this.font, "📊 JUMLAH ROLE (COUNT)", leftColX + 6, 120, 0xFFFFD700);
+        guiGraphics.fill(leftColX, 119, leftColX + panelWidth, 161, 0xAA111111);
+        guiGraphics.fill(leftColX, 119, leftColX + panelWidth, 120, 0x55FFFFFF);
+        guiGraphics.drawString(this.font, "📊 JUMLAH ROLE (COUNT)", leftColX + 6, 121, 0xFFFFD700);
 
-        guiGraphics.drawString(this.font, "Mafia:", leftColX + 8, 125, 0xFFFF5555);
-        guiGraphics.drawString(this.font, "Doctor:", leftColX + 8, 141, 0xFF5555FF);
-        guiGraphics.drawString(this.font, "Police:", leftColX + 8, 157, 0xFFFFAA00);
+        guiGraphics.drawString(this.font, "Mafia:", leftColX + 8, 124, 0xFFFF5555);
+        guiGraphics.drawString(this.font, "Doctor:", leftColX + 8, 136, 0xFF5555FF);
+        guiGraphics.drawString(this.font, "Police:", leftColX + 8, 148, 0xFFFFAA00);
 
         // --- Right Panel Boxes ---
         int rightColX = centerX + 5;
@@ -297,11 +305,11 @@ public class AdminControlScreen extends Screen {
 
         String statusStr = packetData.isGameRunning ? "BERJALAN" : "TIDAK AKTIF";
         int statusColor = packetData.isGameRunning ? 0xFF55FF55 : 0xFFFF5555;
-        String pkModeStr = packetData.parkourGroupMode ? "Bareng-bareng" : "Perwakilan";
+        String pkModeStr = packetData.isParkourEnabled ? "Aktif (ON)" : "Nonaktif (OFF)";
         guiGraphics.drawString(this.font, "Status: " + statusStr, rightColX + 8, 46, statusColor);
         guiGraphics.drawString(this.font, "Fase: " + packetData.phaseName, rightColX + 8, 56, 0xFFFFFF55);
         guiGraphics.drawString(this.font, "Sisa Waktu: " + packetData.timeRemaining + " s", rightColX + 8, 66, 0xFF55FFFF);
-        guiGraphics.drawString(this.font, "Mode Parkour: " + pkModeStr, rightColX + 8, 76, 0xFFFF77FF);
+        guiGraphics.drawString(this.font, "Minigame Parkour: " + pkModeStr, rightColX + 8, 76, 0xFFFF77FF);
 
         // 4. Player Roster & Role Override Box
         guiGraphics.fill(rightColX, 88, rightColX + panelWidth, 270, 0xAA111111);

@@ -6,7 +6,9 @@ import com.corazon.corazonmod.network.ModMessages;
 import com.corazon.corazonmod.network.NightActionPacket;
 import com.corazon.corazonmod.network.OpenAdminMenuPacket;
 import com.corazon.corazonmod.network.OpenNightActionPacket;
+import com.corazon.corazonmod.network.OpenParkourModeVotePacket;
 import com.corazon.corazonmod.network.OpenRoleRevealPacket;
+import com.corazon.corazonmod.network.OpenRunnerSelectionPacket;
 import com.corazon.corazonmod.network.OpenVotingScreenPacket;
 import com.corazon.corazonmod.network.OpenVotingScreenPacket.PlayerEntry;
 import com.corazon.corazonmod.network.VotePlayerPacket;
@@ -47,6 +49,7 @@ public class DontLieGame {
     private int customSearchDuration = 300;
     private int customDiscussionDuration = 90;
     private int customVotingDuration = 30;
+    private int customRunnerVoteDuration = 15;
 
     private int minigameScore = 0;
 
@@ -61,7 +64,24 @@ public class DontLieGame {
     private UUID doctorTarget = null;
     private UUID parkourRunnerUUID = null;
     private boolean isParkourFinished = false;
+    private boolean isParkourEnabled = true; // Admin toggle ON/OFF for Parkour minigame
     private boolean parkourGroupMode = false; // false = Perwakilan (1 Runner), true = Bareng-bareng (Semua Pemain)
+    private boolean isParkourModeVotingPhase = false;
+    private final Map<UUID, String> parkourModeVotes = new HashMap<>();
+    private boolean isRunnerVotingPhase = false;
+    private final Map<UUID, UUID> runnerVotes = new HashMap<>();
+
+    public boolean isParkourEnabled() {
+        return isParkourEnabled;
+    }
+
+    public void setParkourEnabled(boolean enabled) {
+        this.isParkourEnabled = enabled;
+    }
+
+    public void toggleParkourEnabled() {
+        this.isParkourEnabled = !this.isParkourEnabled;
+    }
 
     public boolean isParkourGroupMode() {
         return parkourGroupMode;
@@ -83,16 +103,29 @@ public class DontLieGame {
         return parkourRunnerUUID;
     }
 
+    public int getCustomRunnerVoteDuration() {
+        return customRunnerVoteDuration;
+    }
+
+    public void setCustomRunnerVoteDuration(int duration) {
+        if (duration > 0) this.customRunnerVoteDuration = duration;
+    }
+
     public void setCustomDurations(int hidingSeconds, int searchSeconds, int discussionSeconds, int votingSeconds) {
-        setCustomDurations(hidingSeconds, 120, searchSeconds, discussionSeconds, votingSeconds);
+        setCustomDurations(hidingSeconds, 120, searchSeconds, discussionSeconds, votingSeconds, 15);
     }
 
     public void setCustomDurations(int hidingSeconds, int minigameSeconds, int searchSeconds, int discussionSeconds, int votingSeconds) {
+        setCustomDurations(hidingSeconds, minigameSeconds, searchSeconds, discussionSeconds, votingSeconds, 15);
+    }
+
+    public void setCustomDurations(int hidingSeconds, int minigameSeconds, int searchSeconds, int discussionSeconds, int votingSeconds, int runnerVoteSeconds) {
         if (hidingSeconds > 0) this.customHidingDuration = hidingSeconds;
         if (minigameSeconds > 0) this.customMinigameDuration = minigameSeconds;
         if (searchSeconds > 0) this.customSearchDuration = searchSeconds;
         if (discussionSeconds > 0) this.customDiscussionDuration = discussionSeconds;
         if (votingSeconds > 0) this.customVotingDuration = votingSeconds;
+        if (runnerVoteSeconds > 0) this.customRunnerVoteDuration = runnerVoteSeconds;
     }
 
     public int getCustomMinigameDuration() {
@@ -444,14 +477,184 @@ public class DontLieGame {
         }
     }
 
+    public boolean isParkourModeVotingPhase() {
+        return isParkourModeVotingPhase;
+    }
+
+    public void startParkourModeVoting(MinecraftServer server) {
+        this.isParkourModeVotingPhase = true;
+        this.isRunnerVotingPhase = false;
+        this.parkourModeVotes.clear();
+        this.phaseTimeRemaining = customRunnerVoteDuration;
+
+        OpenParkourModeVotePacket packet = new OpenParkourModeVotePacket(customRunnerVoteDuration);
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                ModMessages.sendToPlayer(packet, p);
+                p.level().playSound(null, p.blockPosition(), SoundEvents.VILLAGER_WORK_CARTOGRAPHER, SoundSource.MASTER, 1.0f, 1.2f);
+            }
+        }
+
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
+        broadcastToAll(server, Component.literal("🏃 VOTING MODE PARKOUR (" + customRunnerVoteDuration + " DETIK) DIMULAI!").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("🗳️ Buka layar pop-up dan pilih: BARENG-BARENG atau PERWAKILAN!").withStyle(ChatFormatting.YELLOW));
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
+    }
+
+    public void voteParkourMode(ServerPlayer voter, String choice) {
+        if (!isParkourModeVotingPhase) return;
+        if (!isAlive(voter.getUUID())) return;
+
+        if (!"BARENG_BARENG".equals(choice) && !"PERWAKILAN".equals(choice)) return;
+
+        parkourModeVotes.put(voter.getUUID(), choice);
+        String choiceName = "BARENG_BARENG".equals(choice) ? "👥 BARENG-BARENG" : "👤 PERWAKILAN";
+        voter.sendSystemMessage(Component.literal("✓ Kamu memilih mode Parkour: " + choiceName).withStyle(ChatFormatting.GREEN));
+        broadcastToAll(voter.server, Component.literal("🗳️ " + voter.getScoreboardName() + " telah memilih mode parkour. (" + parkourModeVotes.size() + "/" + getAliveCount() + ")").withStyle(ChatFormatting.YELLOW));
+
+        if (parkourModeVotes.size() >= getAliveCount()) {
+            resolveParkourModeVoting(voter.server);
+        }
+    }
+
+    public void resolveParkourModeVoting(MinecraftServer server) {
+        if (!isParkourModeVotingPhase) return;
+        isParkourModeVotingPhase = false;
+
+        int barengCount = 0;
+        int perwakilanCount = 0;
+        for (String c : parkourModeVotes.values()) {
+            if ("PERWAKILAN".equals(c)) {
+                perwakilanCount++;
+            } else {
+                barengCount++;
+            }
+        }
+
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+        broadcastToAll(server, Component.literal("📊 HASIL VOTING MODE PARKOUR:").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("👥 Bareng-bareng: " + barengCount + " Vote | 👤 Perwakilan: " + perwakilanCount + " Vote").withStyle(ChatFormatting.YELLOW));
+
+        if (perwakilanCount > barengCount) {
+            this.parkourGroupMode = false;
+            broadcastToAll(server, Component.literal("🎉 Mode PERWAKILAN (1 Runner) Terpilih!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+            broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+            startRunnerSelection(server);
+        } else {
+            this.parkourGroupMode = true;
+            broadcastToAll(server, Component.literal("🎉 Mode BARENG-BARENG (Semua Pemain) Terpilih!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+            broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+            setPhase(server, GamePhase.MINIGAME);
+        }
+    }
+
+    public boolean isRunnerVotingPhase() {
+        return isRunnerVotingPhase;
+    }
+
+    public void startRunnerSelection(MinecraftServer server) {
+        this.isRunnerVotingPhase = true;
+        this.runnerVotes.clear();
+        this.phaseTimeRemaining = customRunnerVoteDuration;
+
+        List<OpenRunnerSelectionPacket.RunnerCandidateEntry> candidates = new ArrayList<>();
+        for (UUID uuid : alivePlayers) {
+            ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+            if (p != null) {
+                candidates.add(new OpenRunnerSelectionPacket.RunnerCandidateEntry(uuid, p.getScoreboardName()));
+            }
+        }
+
+        OpenRunnerSelectionPacket packet = new OpenRunnerSelectionPacket(candidates);
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+                ModMessages.sendToPlayer(packet, p);
+                p.level().playSound(null, p.blockPosition(), SoundEvents.VILLAGER_WORK_CARTOGRAPHER, SoundSource.MASTER, 1.0f, 1.2f);
+            }
+        }
+
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
+        broadcastToAll(server, Component.literal("🏃 VOTING PARKOUR RUNNER (" + customRunnerVoteDuration + " DETIK) DIMULAI!").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("🗳️ Buka layar pop-up dan pilih pemain yang mewakili kelompok!").withStyle(ChatFormatting.YELLOW));
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.LIGHT_PURPLE));
+    }
+
+    public void voteRunner(ServerPlayer voter, UUID targetUUID) {
+        if (!isRunnerVotingPhase) return;
+        if (!isAlive(voter.getUUID())) return;
+
+        ServerPlayer target = voter.server.getPlayerList().getPlayer(targetUUID);
+        if (target == null || !isAlive(target.getUUID())) return;
+
+        runnerVotes.put(voter.getUUID(), target.getUUID());
+        voter.sendSystemMessage(Component.literal("✓ Kamu memilih " + target.getScoreboardName() + " sebagai Parkour Runner.").withStyle(ChatFormatting.GREEN));
+        broadcastToAll(voter.server, Component.literal("🗳️ " + voter.getScoreboardName() + " telah memberikan suara runner. (" + runnerVotes.size() + "/" + getAliveCount() + ")").withStyle(ChatFormatting.YELLOW));
+
+        if (runnerVotes.size() >= getAliveCount()) {
+            resolveRunnerVoting(voter.server);
+        }
+    }
+
+    public void resolveRunnerVoting(MinecraftServer server) {
+        if (!isRunnerVotingPhase) return;
+        isRunnerVotingPhase = false;
+
+        Map<UUID, Integer> voteCounts = new HashMap<>();
+        for (UUID targetUUID : runnerVotes.values()) {
+            voteCounts.put(targetUUID, voteCounts.getOrDefault(targetUUID, 0) + 1);
+        }
+
+        UUID highestVoted = null;
+        int maxVotes = 0;
+        for (Map.Entry<UUID, Integer> entry : voteCounts.entrySet()) {
+            if (entry.getValue() > maxVotes) {
+                maxVotes = entry.getValue();
+                highestVoted = entry.getKey();
+            }
+        }
+
+        if (highestVoted == null) {
+            // Fallback to random alive player if no votes were placed
+            for (UUID uuid : alivePlayers) {
+                if (server.getPlayerList().getPlayer(uuid) != null) {
+                    highestVoted = uuid;
+                    break;
+                }
+            }
+        }
+
+        if (highestVoted != null) {
+            setParkourRunner(highestVoted);
+            ServerPlayer winner = server.getPlayerList().getPlayer(highestVoted);
+            String winnerName = winner != null ? winner.getScoreboardName() : "Runner";
+
+            broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+            broadcastToAll(server, Component.literal("🎉 " + winnerName + " TERPILIH SEBAGAI PARKOUR RUNNER KELOMPOK!").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+            broadcastToAll(server, Component.literal("🗳️ Total Suara: " + maxVotes + " Vote").withStyle(ChatFormatting.YELLOW));
+            broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+        }
+
+        setPhase(server, GamePhase.MINIGAME);
+    }
+
     public void skipCurrentPhase(MinecraftServer server) {
         if (!isGameRunning()) return;
+        if (isParkourModeVotingPhase) {
+            resolveParkourModeVoting(server);
+            return;
+        }
+        if (isRunnerVotingPhase) {
+            resolveRunnerVoting(server);
+            return;
+        }
         broadcastToAll(server, Component.literal("[Don't Lie] ⏩ Fase " + currentPhase.getDisplayName() + " dipaksa lewat oleh Admin!").withStyle(ChatFormatting.YELLOW));
         advancePhase(server);
     }
 
     public void setPhase(MinecraftServer server, GamePhase phase) {
         this.currentPhase = phase;
+        this.isParkourModeVotingPhase = false;
+        this.isRunnerVotingPhase = false;
         removeMafiaDaggers(server);
         if (phase == GamePhase.HIDING && customHidingDuration > 0) {
             this.phaseTimeRemaining = customHidingDuration;
@@ -791,6 +994,30 @@ public class DontLieGame {
 
         tickCounter++;
 
+        if (isParkourModeVotingPhase) {
+            if (tickCounter % 20 == 0) {
+                if (phaseTimeRemaining > 0) {
+                    phaseTimeRemaining--;
+                }
+                if (phaseTimeRemaining <= 0) {
+                    resolveParkourModeVoting(server);
+                }
+            }
+            return;
+        }
+
+        if (isRunnerVotingPhase) {
+            if (tickCounter % 20 == 0) {
+                if (phaseTimeRemaining > 0) {
+                    phaseTimeRemaining--;
+                }
+                if (phaseTimeRemaining <= 0) {
+                    resolveRunnerVoting(server);
+                }
+            }
+            return;
+        }
+
         // Parkour Fall Y-Level Detection during MINIGAME Phase
         if (currentPhase == GamePhase.MINIGAME && !isParkourFinished) {
             var start = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourStart();
@@ -912,7 +1139,11 @@ public class DontLieGame {
 
     private void syncGameStateToAll(MinecraftServer server) {
         String phaseDisplayName = currentPhase.getDisplayName();
-        if (currentPhase == GamePhase.NIGHT) {
+        if (isParkourModeVotingPhase) {
+            phaseDisplayName = "Vote Mode Parkour";
+        } else if (isRunnerVotingPhase) {
+            phaseDisplayName = "Vote Parkour Runner";
+        } else if (currentPhase == GamePhase.NIGHT) {
             phaseDisplayName = switch (nightSubPhase) {
                 case 0 -> "Night: Mafia Turn";
                 case 1 -> "Night: Doctor Turn";
@@ -975,7 +1206,14 @@ public class DontLieGame {
                         returnPlayerToStartPos(p);
                     }
                 }
-                setPhase(server, GamePhase.MINIGAME);
+                if (isParkourEnabled) {
+                    startParkourModeVoting(server);
+                } else {
+                    broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.YELLOW));
+                    broadcastToAll(server, Component.literal("ℹ️ Minigame Parkour [OFF]. Langsung menuju Fase Pencarian Uang!").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+                    broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.YELLOW));
+                    setPhase(server, GamePhase.SEARCH);
+                }
             }
             case MINIGAME -> {
                 if (parkourGroupMode) {
