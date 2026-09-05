@@ -66,7 +66,10 @@ public class ClientPacketHandler {
             if (currentScreen instanceof NightActionScreen && !"Night Elimination".equalsIgnoreCase(phaseName)) {
                 Minecraft.getInstance().setScreen(null);
             }
-            if (currentScreen instanceof RunnerSelectionScreen && !"Voting Runner".equalsIgnoreCase(phaseName)) {
+            if (currentScreen instanceof RunnerSelectionScreen && !"Vote Parkour Runner".equalsIgnoreCase(phaseName)) {
+                Minecraft.getInstance().setScreen(null);
+            }
+            if (currentScreen instanceof ParkourModeVoteScreen && !"Vote Mode Parkour".equalsIgnoreCase(phaseName)) {
                 Minecraft.getInstance().setScreen(null);
             }
         });
@@ -85,7 +88,7 @@ public class ClientPacketHandler {
 
     public static void handleOpenRunnerSelection(com.corazon.corazonmod.network.OpenRunnerSelectionPacket packet) {
         Minecraft.getInstance().execute(() -> {
-            currentPhaseName = "Voting Runner";
+            currentPhaseName = "Vote Parkour Runner";
             List<com.corazon.corazonmod.network.OpenRunnerSelectionPacket.RunnerCandidateEntry> candidates = packet.candidates;
             Minecraft.getInstance().setScreen(new RunnerSelectionScreen(candidates));
         });
@@ -93,7 +96,7 @@ public class ClientPacketHandler {
 
     public static void handleOpenParkourModeVote(com.corazon.corazonmod.network.OpenParkourModeVotePacket packet) {
         Minecraft.getInstance().execute(() -> {
-            currentPhaseName = "Voting Mode Parkour";
+            currentPhaseName = "Vote Mode Parkour";
             Minecraft.getInstance().setScreen(new ParkourModeVoteScreen(packet.durationSeconds));
         });
     }

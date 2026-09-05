@@ -489,7 +489,7 @@ public class DontLieGame {
 
         OpenParkourModeVotePacket packet = new OpenParkourModeVotePacket(customRunnerVoteDuration);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+            if (isParticipant(p.getUUID())) {
                 ModMessages.sendToPlayer(packet, p);
                 p.level().playSound(null, p.blockPosition(), SoundEvents.VILLAGER_WORK_CARTOGRAPHER, SoundSource.MASTER, 1.0f, 1.2f);
             }
@@ -567,7 +567,7 @@ public class DontLieGame {
 
         OpenRunnerSelectionPacket packet = new OpenRunnerSelectionPacket(candidates);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            if (isParticipant(p.getUUID()) && isAlive(p.getUUID())) {
+            if (isParticipant(p.getUUID())) {
                 ModMessages.sendToPlayer(packet, p);
                 p.level().playSound(null, p.blockPosition(), SoundEvents.VILLAGER_WORK_CARTOGRAPHER, SoundSource.MASTER, 1.0f, 1.2f);
             }
@@ -1001,7 +1001,13 @@ public class DontLieGame {
                 }
                 if (phaseTimeRemaining <= 0) {
                     resolveParkourModeVoting(server);
+                    return;
                 }
+            }
+            hudSyncCounter++;
+            if (hudSyncCounter >= 10) {
+                hudSyncCounter = 0;
+                syncGameStateToAll(server);
             }
             return;
         }
@@ -1013,7 +1019,13 @@ public class DontLieGame {
                 }
                 if (phaseTimeRemaining <= 0) {
                     resolveRunnerVoting(server);
+                    return;
                 }
+            }
+            hudSyncCounter++;
+            if (hudSyncCounter >= 10) {
+                hudSyncCounter = 0;
+                syncGameStateToAll(server);
             }
             return;
         }
