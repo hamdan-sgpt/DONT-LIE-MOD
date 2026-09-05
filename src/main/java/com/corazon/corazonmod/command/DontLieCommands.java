@@ -386,6 +386,21 @@ public class DontLieCommands {
                     })
                 )
 
+                // === SET PARKOUR CHECKPOINT COORDS ===
+                .then(Commands.literal("setparkourcheckpoint")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        double x = player.getX();
+                        double y = player.getY();
+                        double z = player.getZ();
+
+                        ArenaConfigManager.getInstance().setParkourCheckpoint(x, y, z);
+                        ctx.getSource().sendSuccess(() -> Component.literal(String.format("[Don't Lie] ⭐ Posisi CHECKPOINT Parkour (+1.5m) disimpan ke JSON! (X: %.2f, Y: %.2f, Z: %.2f)", x, y, z)), true);
+                        return 1;
+                    })
+                )
+
                 // === SET PARKOUR FINISH COORDS ===
                 .then(Commands.literal("setparkourfinish")
                     .requires(source -> source.hasPermission(2))

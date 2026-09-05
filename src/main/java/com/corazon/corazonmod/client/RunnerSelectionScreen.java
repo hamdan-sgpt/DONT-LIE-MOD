@@ -84,7 +84,7 @@ public class RunnerSelectionScreen extends Screen {
         ticksOpen++;
 
         // Auto-close if phase changes from Runner Selection
-        if (ticksOpen > 10 && !"Voting Runner".equalsIgnoreCase(ClientPacketHandler.currentPhaseName)) {
+        if (ticksOpen > 10 && !"Vote Parkour Runner".equalsIgnoreCase(ClientPacketHandler.currentPhaseName)) {
             this.onClose();
         }
     }

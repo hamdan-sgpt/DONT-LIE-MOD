@@ -70,6 +70,7 @@ public class DontLieGame {
     private final Map<UUID, String> parkourModeVotes = new HashMap<>();
     private boolean isRunnerVotingPhase = false;
     private final Map<UUID, UUID> runnerVotes = new HashMap<>();
+    private final Set<UUID> claimedCheckpoints = new HashSet<>();
 
     public boolean isParkourEnabled() {
         return isParkourEnabled;
@@ -705,6 +706,7 @@ public class DontLieGame {
         if (phase == GamePhase.MINIGAME) {
             this.minigameScore = 0;
             this.isParkourFinished = false;
+            this.claimedCheckpoints.clear();
 
             var parkourStart = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourStart();
             ServerLevel dontLieLevel = server.getLevel(ArenaBuilder.DONTLIE_DIMENSION_KEY);
@@ -929,7 +931,11 @@ public class DontLieGame {
             nightSubPhase = 0;
             resolveNightActions(server);
             if (checkWinConditions(server)) return;
-            setPhase(server, GamePhase.SEARCH);
+            if (isParkourEnabled) {
+                startParkourModeVoting(server);
+            } else {
+                setPhase(server, GamePhase.SEARCH);
+            }
         }
     }
 
@@ -1055,6 +1061,38 @@ public class DontLieGame {
                 }
             }
         }
+        // Parkour Checkpoint Detection (+1.5 min bonus search time, 1x per round)
+        if (currentPhase == GamePhase.MINIGAME && !isParkourFinished) {
+            var checkpoint = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourCheckpoint();
+            if (parkourGroupMode) {
+                for (UUID uuid : alivePlayers) {
+                    if (!claimedCheckpoints.contains(uuid)) {
+                        ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+                        if (p != null) {
+                            double dx = p.getX() - checkpoint.x;
+                            double dy = p.getY() - checkpoint.y;
+                            double dz = p.getZ() - checkpoint.z;
+                            if ((dx * dx + dy * dy + dz * dz) <= 9.0) { // within 3 blocks radius
+                                claimedCheckpoints.add(uuid);
+                                triggerParkourCheckpointBonus(server, p);
+                            }
+                        }
+                    }
+                }
+            } else if (parkourRunnerUUID != null && !claimedCheckpoints.contains(parkourRunnerUUID)) {
+                ServerPlayer runner = server.getPlayerList().getPlayer(parkourRunnerUUID);
+                if (runner != null && isAlive(runner.getUUID())) {
+                    double dx = runner.getX() - checkpoint.x;
+                    double dy = runner.getY() - checkpoint.y;
+                    double dz = runner.getZ() - checkpoint.z;
+                    if ((dx * dx + dy * dy + dz * dz) <= 9.0) { // within 3 blocks radius
+                        claimedCheckpoints.add(parkourRunnerUUID);
+                        triggerParkourCheckpointBonus(server, runner);
+                    }
+                }
+            }
+        }
+
         if (currentPhase == GamePhase.MINIGAME && !isParkourFinished) {
             var finish = com.corazon.corazonmod.config.ArenaConfigManager.getInstance().getParkourFinish();
             if (parkourGroupMode) {
@@ -1113,6 +1151,24 @@ public class DontLieGame {
                 advancePhase(server);
             }
         }
+    }
+
+    public void triggerParkourCheckpointBonus(MinecraftServer server, ServerPlayer player) {
+        int extraSeconds = 90; // +1.5 minutes (90 seconds) bonus search time!
+
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+        broadcastToAll(server, Component.literal("⭐ CHECKPOINT PARKOUR DICAPAI! ⭐").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("🏃 Pemain: " + player.getScoreboardName()).withStyle(ChatFormatting.AQUA));
+        broadcastToAll(server, Component.literal("🎁 BONUS WAKTU PENCARIAN: +1.5 MENIT (+90 Detik)! (1x per ronde)").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD));
+        broadcastToAll(server, Component.literal("========================================").withStyle(ChatFormatting.GOLD));
+
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (isParticipant(p.getUUID())) {
+                p.level().playSound(null, p.blockPosition(), SoundEvents.PLAYER_LEVELUP, SoundSource.MASTER, 1.0f, 1.2f);
+            }
+        }
+
+        addTime(extraSeconds);
     }
 
     public void finishParkour(MinecraftServer server, ServerPlayer runner) {
@@ -1269,7 +1325,11 @@ public class DontLieGame {
                     nightSubPhase = 0;
                     resolveNightActions(server);
                     if (checkWinConditions(server)) return;
-                    setPhase(server, GamePhase.SEARCH);
+                    if (isParkourEnabled) {
+                        startParkourModeVoting(server);
+                    } else {
+                        setPhase(server, GamePhase.SEARCH);
+                    }
                 }
             }
         }
