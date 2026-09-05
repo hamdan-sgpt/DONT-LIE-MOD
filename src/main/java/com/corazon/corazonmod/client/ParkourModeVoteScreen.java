@@ -29,7 +29,7 @@ public class ParkourModeVoteScreen extends Screen {
         return false;
     }
 
-    @Override.
+    @Override
     protected void init() {
         super.init();
 
