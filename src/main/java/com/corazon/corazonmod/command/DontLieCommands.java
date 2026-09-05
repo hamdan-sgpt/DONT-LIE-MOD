@@ -55,19 +55,36 @@ public class DontLieCommands {
                     )
                 )
                 .then(Commands.literal("join")
-                    .requires(source -> source.hasPermission(2))
                     .executes(ctx -> {
                         ServerPlayer player = ctx.getSource().getPlayerOrException();
                         DontLieGame.getInstance().registerPlayer(player);
                         return 1;
                     })
                     .then(Commands.argument("target", EntityArgument.player())
+                        .requires(source -> source.hasPermission(2))
                         .executes(ctx -> {
                             ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
                             DontLieGame.getInstance().registerPlayer(target);
                             return 1;
                         })
                     )
+                )
+
+                // === REGISTER ALL ONLINE PLAYERS (ADMIN ONLY) ===
+                .then(Commands.literal("registerall")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        var server = ctx.getSource().getServer();
+                        int added = 0;
+                        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                            if (DontLieGame.getInstance().registerPlayer(p)) {
+                                added++;
+                            }
+                        }
+                        final int finalAdded = added;
+                        ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] ✅ Berhasil mendaftarkan " + finalAdded + " pemain online!").withStyle(net.minecraft.ChatFormatting.GREEN), true);
+                        return 1;
+                    })
                 )
 
                 // === UNREGISTER / LEAVE (ADMIN ONLY) ===
@@ -229,7 +246,7 @@ public class DontLieCommands {
                         }
 
                         // 2. Check for physical MoneyPouchEntity in the world
-                        for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+                        for (net.minecraft.world.entity.Entity entity : level.getEntities().getAll()) {
                             if (entity instanceof com.corazon.corazonmod.entity.MoneyPouchEntity pouchEntity) {
                                 admin.teleportTo((ServerLevel) pouchEntity.level(), pouchEntity.getX(), pouchEntity.getY(), pouchEntity.getZ(), pouchEntity.getYRot(), pouchEntity.getXRot());
                                 admin.connection.teleport(pouchEntity.getX(), pouchEntity.getY(), pouchEntity.getZ(), pouchEntity.getYRot(), pouchEntity.getXRot());
@@ -323,6 +340,70 @@ public class DontLieCommands {
 
                         ArenaConfigManager.getInstance().setMainSpawn(x, y, z, yaw, pitch);
                         ctx.getSource().sendSuccess(() -> Component.literal(String.format("[Don't Lie] 📍 Spawn arena baru disimpan ke JSON! (X: %.3f, Y: %.3f, Z: %.3f, Yaw: %.1f, Pitch: %.1f)", x, y, z, yaw, pitch)), true);
+                        return 1;
+                    })
+                )
+
+                // === SET PARKOUR START COORDS ===
+                .then(Commands.literal("setparkourstart")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        double x = player.getX();
+                        double y = player.getY();
+                        double z = player.getZ();
+                        float yaw = player.getYRot();
+                        float pitch = player.getXRot();
+
+                        ArenaConfigManager.getInstance().setParkourStart(x, y, z, yaw, pitch);
+                        ctx.getSource().sendSuccess(() -> Component.literal(String.format("[Don't Lie] 🏃 Posisi START Parkour disimpan ke JSON! (X: %.2f, Y: %.2f, Z: %.2f)", x, y, z)), true);
+                        return 1;
+                    })
+                )
+
+                // === SET PARKOUR FINISH COORDS ===
+                .then(Commands.literal("setparkourfinish")
+                    .requires(source -> source.hasPermission(2))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        double x = player.getX();
+                        double y = player.getY();
+                        double z = player.getZ();
+
+                        ArenaConfigManager.getInstance().setParkourFinish(x, y, z);
+                        ctx.getSource().sendSuccess(() -> Component.literal(String.format("[Don't Lie] 🏁 Posisi FINISH Parkour disimpan ke JSON! (X: %.2f, Y: %.2f, Z: %.2f)", x, y, z)), true);
+                        return 1;
+                    })
+                )
+
+                // === SET PARKOUR RUNNER ===
+                .then(Commands.literal("setrunner")
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        DontLieGame.getInstance().setParkourRunner(player.getUUID());
+                        ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🏃 " + player.getScoreboardName() + " telah dipilih sebagai Parkour Runner!"), true);
+                        return 1;
+                    })
+                    .then(Commands.argument("target", EntityArgument.player())
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> {
+                            ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                            DontLieGame.getInstance().setParkourRunner(target.getUUID());
+                            ctx.getSource().sendSuccess(() -> Component.literal("[Don't Lie] 🏃 " + target.getScoreboardName() + " ditetapkan sebagai Parkour Runner oleh Admin!"), true);
+                            return 1;
+                        })
+                    )
+                )
+
+                // === MANUAL FINISH PARKOUR ===
+                .then(Commands.literal("finishparkour")
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        if (DontLieGame.getInstance().getCurrentPhase() == com.corazon.corazonmod.game.GamePhase.MINIGAME) {
+                            DontLieGame.getInstance().finishParkour(ctx.getSource().getServer(), player);
+                        } else {
+                            ctx.getSource().sendFailure(Component.literal("[Don't Lie] ❌ Garis Finish Parkour hanya aktif saat Fase Minigame!"));
+                        }
                         return 1;
                     })
                 )
